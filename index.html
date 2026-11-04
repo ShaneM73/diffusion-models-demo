@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diffusion Models Lab</title>
+<meta name="description" content="An interactive 3D walkthrough of diffusion models: the math, the network architecture, and a step-by-step image generation example. English and Simplified Chinese.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,600;7..72,800&family=IBM+Plex+Sans:wght@400;500;700&family=Noto+Serif+SC:wght@600;900&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&family=STIX+Two+Text:ital@0;1&display=swap">
+<style>
+/* Layout: one reading column (~68ch) with full-bleed lab "stages" for interactive pieces; signal = teal, noise = orange throughout */
+:root{
+  --bg:#edf1f2; --panel:#f8fafa; --fg:#13212a; --muted:#57666f; --line:#cdd7db;
+  --signal:#0e7a73; --noise:#d4602a; --ink:#33438f; --stage:#e3e9eb;
+  --f-display:"Literata","Noto Serif SC","Songti SC",Georgia,serif;
+  --f-body:"IBM Plex Sans","Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --f-math:"STIX Two Text","Times New Roman",serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1417; --panel:#141d21; --fg:#e4ecee; --muted:#93a4ac; --line:#28363c;
+  --signal:#3cc4b7; --noise:#f08a52; --ink:#9aa8f0; --stage:#10181c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1417; --panel:#141d21; --fg:#e4ecee; --muted:#93a4ac; --line:#28363c;
+  --signal:#3cc4b7; --noise:#f08a52; --ink:#9aa8f0; --stage:#10181c; color-scheme:dark}
+:lang(zh) {--f-display:"Noto Serif SC","Songti SC",serif; --f-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.7;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 64px}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:56px}
+.col{max-width:68ch}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.2}
+h1{font-size:clamp(2.1rem,6.5vw,3.4rem);font-weight:800}
+h2{font-size:clamp(1.5rem,4.5vw,2.1rem);font-weight:800}
+h3{font-size:1.15rem;font-weight:600}
+:lang(zh) h1,:lang(zh) h2{font-weight:900;letter-spacing:.02em}
+p{margin:0}
+a{color:var(--ink)}
+.eyebrow{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+section{display:flex;flex-direction:column;gap:20px}
+.stack{display:flex;flex-direction:column;gap:14px}
+.sig{color:var(--signal);font-weight:700}.noi{color:var(--noise);font-weight:700}
+.lede{font-size:1.08rem;color:var(--muted);max-width:62ch}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.lang{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.lang button{border:0;border-radius:0;padding:5px 12px;background:var(--panel)}
+.lang button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.stage{background:var(--stage);border:1px solid var(--line);border-radius:6px;overflow:hidden;position:relative}
+#three{width:100%;height:clamp(320px,62vw,540px);display:block;touch-action:none}
+.hud{position:absolute;top:12px;left:12px;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
+.chip{font-family:var(--f-mono);font-size:.75rem;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--fg)}
+.chip.on-sig{border-color:var(--signal);color:var(--signal)}
+.chip.on-noi{border-color:var(--noise);color:var(--noise)}
+.controls{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;padding:14px;border-top:1px solid var(--line);background:var(--panel)}
+.controls .grow{flex:1 1 220px;display:flex;align-items:center;gap:10px;min-width:0}
+input[type=range]{flex:1;min-width:0;accent-color:var(--signal)}
+button{font-family:var(--f-body);font-size:.92rem;font-weight:500;padding:7px 14px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+button:hover{border-color:var(--fg)}
+button.primary{background:var(--signal);border-color:var(--signal);color:var(--panel)}
+button[aria-pressed="true"]{border-color:var(--ink);color:var(--ink)}
+button:focus-visible,input:focus-visible,.blk:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:.85rem;color:var(--muted);white-space:nowrap}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:.88rem;color:var(--muted)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.eq{font-family:var(--f-math);font-size:1.25rem;padding:14px 18px;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow-x:auto;white-space:nowrap;line-height:1.6}
+.eq i{font-style:italic}
+.eq .c-s{color:var(--signal)} .eq .c-n{color:var(--noise)}
+.eq sub,.eq sup{font-size:.7em}
+.mathgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:24px}
+.mathgrid>div{min-width:0}
+.mixer{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:end}
+.mixer figure{margin:0;display:flex;flex-direction:column;gap:6px;min-width:0}
+.mixer canvas{width:100%;aspect-ratio:1;border-radius:4px;border:1px solid var(--line);display:block;image-rendering:pixelated}
+figcaption{font-size:.8rem;color:var(--muted);text-align:center}
+.bars{display:flex;flex-direction:column;gap:8px}
+.bar{display:grid;grid-template-columns:8.5em 1fr 4.2em;gap:10px;align-items:center;font-size:.88rem}
+.bar .track{height:10px;background:var(--line);border-radius:5px;overflow:hidden}
+.bar .fill{height:100%;border-radius:5px}
+#chart{width:100%;height:220px;display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px;display:flex;flex-direction:column;gap:12px}
+pre{font-family:var(--f-mono);font-size:.82rem;line-height:1.6;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:0}
+pre .cm{color:var(--muted)}
+.note{font-size:.9rem;color:var(--muted);border-left:2px solid var(--line);padding-left:12px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tabs button[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.diagram{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px}
+.diagram svg{display:block;min-width:620px;width:100%;height:auto}
+.blk{cursor:pointer}
+.blk rect{fill:var(--bg);stroke:var(--muted);stroke-width:1.2}
+.blk.enc rect{stroke:var(--signal)} .blk.dec rect{stroke:var(--ink)}
+.blk.io rect{stroke:var(--noise)}
+.blk:hover rect,.blk.sel rect{stroke-width:2.6}
+.blk.sel rect{fill:var(--stage)}
+.blk text{fill:var(--fg);font-family:var(--f-body);font-size:12px;text-anchor:middle}
+.blk text.s{fill:var(--muted);font-family:var(--f-mono);font-size:10px}
+.ln{stroke:var(--muted);stroke-width:1.4;fill:none}
+.ln.skip{stroke:var(--signal);stroke-dasharray:5 4}
+.ln.txt{stroke:var(--ink);stroke-dasharray:2 3}
+.lbl{fill:var(--muted);font-family:var(--f-body);font-size:11px}
+#detail{min-height:5.2em}
+.prompts{display:flex;gap:8px;flex-wrap:wrap}
+.prompts button[aria-pressed="true"]{background:var(--signal);color:var(--panel);border-color:var(--signal)}
+.triple{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:14px}
+.triple figure{margin:0;display:flex;flex-direction:column;gap:6px;min-width:0}
+.triple canvas{width:100%;aspect-ratio:1;border-radius:4px;display:block;border:1px solid var(--line)}
+.strip{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;padding:0 14px 14px}
+.strip figure{margin:0;display:flex;flex-direction:column;gap:3px;min-width:0}
+.strip canvas{width:100%;aspect-ratio:1;border-radius:3px;display:block;cursor:pointer;border:1px solid var(--line)}
+.strip figcaption{font-family:var(--f-mono);font-size:.68rem}
+@media (max-width:520px){.triple{gap:6px;padding:10px}.triple figcaption{font-size:.7rem}.strip{grid-template-columns:repeat(3,1fr)}}
+footer{font-size:.85rem;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="stack">
+  <div class="topbar">
+    <div class="eyebrow" data-i18n="eyebrow"></div>
+    <div class="lang" role="group" aria-label="Language / 语言">
+      <button id="lang-en" aria-pressed="true" lang="en">English</button>
+      <button id="lang-zh" aria-pressed="false" lang="zh-CN">简体中文</button>
+    </div>
+  </div>
+  <h1 data-i18n="h1"></h1>
+  <p class="lede" data-i18n="lede"></p>
+</header>
+
+<section aria-label="3D">
+  <div class="stage">
+    <div id="three" role="img"></div>
+    <div class="hud"><span class="chip" id="modeChip"></span><span class="chip" id="tChip">t = 0</span></div>
+    <div class="controls">
+      <div class="grow"><label for="tSlider" class="num" data-i18n="timestep"></label><input id="tSlider" type="range" min="0" max="1000" value="0" step="1"><span class="num" id="abNum">ᾱ = 1.000</span></div>
+      <button id="btnNoise" data-i18n="btnNoise"></button>
+      <button id="btnGen" class="primary" data-i18n="btnGen"></button>
+      <button id="btnArrows" aria-pressed="false" data-i18n="btnArrows"></button>
+    </div>
+  </div>
+  <div class="legend">
+    <span><span class="dot" style="background:var(--signal)"></span><span data-i18n="lg1"></span></span>
+    <span><span class="dot" style="background:var(--noise)"></span><span data-i18n="lg2"></span></span>
+    <span><span class="dot" style="background:var(--muted);opacity:.5"></span><span data-i18n="lg3"></span></span>
+  </div>
+  <p class="note col" data-i18n="note3d"></p>
+</section>
+
+<section aria-labelledby="math">
+  <div class="eyebrow" data-i18n="part1"></div>
+  <h2 id="math" data-i18n="mathH"></h2>
+
+  <div class="stack col">
+    <h3 data-i18n="m1h"></h3>
+    <p data-i18n="m1p"></p>
+  </div>
+  <div class="eq"><i>x</i><sub>t</sub> = <span class="c-s">√ᾱ<sub>t</sub></span> · <i>x</i><sub>0</sub> + <span class="c-n">√(1 − ᾱ<sub>t</sub>)</span> · <i>ε</i>,&nbsp;&nbsp; <i>ε</i> ~ 𝒩(0, <i>I</i>),&nbsp;&nbsp; ᾱ<sub>t</sub> = ∏<sub>s≤t</sub>(1 − β<sub>s</sub>)</div>
+
+  <div class="mathgrid">
+    <div class="card">
+      <div class="mixer">
+        <figure><canvas id="mx0" width="48" height="48"></canvas><figcaption data-i18n="capX0"></figcaption></figure>
+        <figure><canvas id="mxe" width="48" height="48"></canvas><figcaption data-i18n="capEps"></figcaption></figure>
+        <figure><canvas id="mxt" width="48" height="48"></canvas><figcaption data-i18n="capXt"></figcaption></figure>
+      </div>
+      <div class="bars">
+        <div class="bar"><span data-i18n="coefS"></span><div class="track"><div class="fill" id="barS" style="background:var(--signal)"></div></div><span class="num" id="numS">1.000</span></div>
+        <div class="bar"><span data-i18n="coefN"></span><div class="track"><div class="fill" id="barN" style="background:var(--noise)"></div></div><span class="num" id="numN">0.000</span></div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center"><label for="mixT" class="num">t</label><input id="mixT" type="range" min="0" max="1000" value="250"><span class="num" id="mixTNum">250</span></div>
+      <p class="num" id="sumNum"></p>
+    </div>
+    <div class="card">
+      <canvas id="chart"></canvas>
+      <p class="note" data-i18n="chartNote"></p>
+    </div>
+  </div>
+
+  <div class="stack col">
+    <h3 data-i18n="m2h"></h3>
+    <p data-i18n="m2p"></p>
+  </div>
+  <div class="eq"><i>L</i>(θ) = 𝔼<sub><i>x</i><sub>0</sub>, <i>ε</i>, <i>t</i></sub> ‖ <i>ε</i> − <i>ε</i><sub>θ</sub>( <span class="c-s">√ᾱ<sub>t</sub></span><i>x</i><sub>0</sub> + <span class="c-n">√(1−ᾱ<sub>t</sub>)</span><i>ε</i>, <i>t</i>, <i>c</i> ) ‖²</div>
+  <pre data-i18n="code"></pre>
+
+  <div class="mathgrid">
+    <div class="stack" style="min-width:0">
+      <h3 data-i18n="m3h"></h3>
+      <p data-i18n="m3p1"></p>
+      <p data-i18n="m3p2"></p>
+      <div class="eq" style="font-size:1.05rem"><i>ε</i><sub>θ</sub><sup>*</sup>(<i>x</i><sub>t</sub>) = −√(1−ᾱ<sub>t</sub>) · ∇<sub><i>x</i></sub> log <i>p</i><sub>t</sub>(<i>x</i><sub>t</sub>)</div>
+      <p data-i18n="m3p3"></p>
+    </div>
+    <div class="stack" style="min-width:0">
+      <h3 data-i18n="m4h"></h3>
+      <p data-i18n="m4p1"></p>
+      <div class="eq" style="font-size:1.05rem"><i>x</i><sub>t−1</sub> = <sup>1</sup>⁄<sub>√α<sub>t</sub></sub> ( <i>x</i><sub>t</sub> − <sup>β<sub>t</sub></sup>⁄<sub>√(1−ᾱ<sub>t</sub>)</sub> <i>ε</i><sub>θ</sub> ) + σ<sub>t</sub><i>z</i></div>
+      <p data-i18n="m4p2"></p>
+      <h3 data-i18n="m5h"></h3>
+      <p data-i18n="m5p"></p>
+      <div class="eq" style="font-size:1.05rem"><i>ε̂</i> = <i>ε</i><sub>θ</sub>(<i>x</i><sub>t</sub>, ∅) + <i>w</i> · [ <i>ε</i><sub>θ</sub>(<i>x</i><sub>t</sub>, <i>c</i>) − <i>ε</i><sub>θ</sub>(<i>x</i><sub>t</sub>, ∅) ]</div>
+    </div>
+  </div>
+  <p class="note col" data-i18n="mathNote"></p>
+</section>
+
+<section aria-labelledby="arch">
+  <div class="eyebrow" data-i18n="part2"></div>
+  <h2 id="arch" data-i18n="archH"></h2>
+  <p class="col" data-i18n="archP"></p>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tabU" aria-selected="true" data-i18n="tabU"></button>
+    <button role="tab" id="tabD" aria-selected="false" data-i18n="tabD"></button>
+  </div>
+  <div class="diagram" id="diagU">
+  <svg viewBox="0 0 720 400" aria-label="U-Net">
+    <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" style="fill:var(--muted)"/></marker></defs>
+    <path class="ln skip" d="M180,95 H540"/><path class="ln skip" d="M260,150 H460"/><path class="ln skip" d="M340,206 H380"/>
+    <text class="lbl" x="360" y="88" text-anchor="middle" data-i18n="svSkip"></text>
+    <path class="ln" d="M100,95 H108" marker-end="url(#ar)"/>
+    <path class="ln" d="M145,155 V178 H188" marker-end="url(#ar)"/>
+    <path class="ln" d="M225,192 V210 H268" marker-end="url(#ar)"/>
+    <path class="ln" d="M305,234 V282 H318" marker-end="url(#ar)"/>
+    <path class="ln" d="M400,282 H415 V236" marker-end="url(#ar)"/>
+    <path class="ln" d="M450,206 H495 V194" marker-end="url(#ar)"/>
+    <path class="ln" d="M530,130 H538" marker-end="url(#ar)"/>
+    <path class="ln" d="M610,95 H618" marker-end="url(#ar)"/>
+    <path class="ln" d="M360,64 V76"/>
+    <text class="lbl" x="430" y="52" data-i18n="svEvery"></text>
+    <path class="ln txt" d="M360,336 V302"/><path class="ln txt" d="M330,340 C300,320 300,250 305,236"/><path class="ln txt" d="M390,340 C420,320 420,250 415,236"/>
+    <text class="lbl" x="470" y="330" data-i18n="svCross"></text>
+    <g class="blk io" data-k="in"><rect x="10" y="35" width="90" height="120" rx="4"/><text x="55" y="88" data-i18n="svIn"></text><text class="s" x="55" y="104">xₜ 64×64×4</text></g>
+    <g class="blk enc" data-k="e1"><rect x="110" y="35" width="70" height="120" rx="4"/><text x="145" y="88" data-i18n="svE1"></text><text class="s" x="145" y="104">64² · 320</text></g>
+    <g class="blk enc" data-k="e2"><rect x="190" y="108" width="70" height="84" rx="4"/><text x="225" y="146" data-i18n="svE2"></text><text class="s" x="225" y="162">32² · 640</text></g>
+    <g class="blk enc" data-k="e3"><rect x="270" y="178" width="70" height="56" rx="4"/><text x="305" y="203" data-i18n="svE3"></text><text class="s" x="305" y="219">16² · 1280</text></g>
+    <g class="blk" data-k="mid"><rect x="320" y="264" width="80" height="36" rx="4"/><text x="360" y="280" data-i18n="svMid"></text><text class="s" x="360" y="294">8² · 1280</text></g>
+    <g class="blk dec" data-k="d3"><rect x="380" y="178" width="70" height="56" rx="4"/><text x="415" y="203" data-i18n="svD3"></text><text class="s" x="415" y="219">16² · 1280</text></g>
+    <g class="blk dec" data-k="d2"><rect x="460" y="108" width="70" height="84" rx="4"/><text x="495" y="146" data-i18n="svD2"></text><text class="s" x="495" y="162">32² · 640</text></g>
+    <g class="blk dec" data-k="d1"><rect x="540" y="35" width="70" height="120" rx="4"/><text x="575" y="88" data-i18n="svD1"></text><text class="s" x="575" y="104">64² · 320</text></g>
+    <g class="blk io" data-k="out"><rect x="620" y="35" width="90" height="120" rx="4"/><text x="665" y="88" data-i18n="svOut"></text><text class="s" x="665" y="104">ε̂ 64×64×4</text></g>
+    <g class="blk" data-k="time"><rect x="300" y="30" width="120" height="34" rx="4"/><text x="360" y="52" data-i18n="svTime"></text></g>
+    <g class="blk" data-k="text"><rect x="290" y="336" width="140" height="40" rx="4"/><text x="360" y="354" data-i18n="svText"></text><text class="s" x="360" y="369">CLIP / T5 → 77×768</text></g>
+  </svg>
+  </div>
+  <div class="diagram" id="diagD" hidden>
+  <svg viewBox="0 0 720 300" aria-label="DiT">
+    <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" style="fill:var(--muted)"/></marker></defs>
+    <path class="ln" d="M100,120 H118" marker-end="url(#ar2)"/><path class="ln" d="M210,120 H228" marker-end="url(#ar2)"/>
+    <path class="ln" d="M340,120 H358" marker-end="url(#ar2)"/><path class="ln" d="M520,120 H538" marker-end="url(#ar2)"/><path class="ln" d="M610,120 H618" marker-end="url(#ar2)"/>
+    <path class="ln txt" d="M440,236 V196"/>
+    <g class="blk io" data-k="in"><rect x="10" y="70" width="90" height="100" rx="4"/><text x="55" y="116" data-i18n="svIn"></text><text class="s" x="55" y="132">xₜ 64×64×4</text></g>
+    <g class="blk enc" data-k="patch"><rect x="120" y="70" width="90" height="100" rx="4"/><text x="165" y="116" data-i18n="svPatch"></text><text class="s" x="165" y="132">2×2 → 1024</text></g>
+    <g class="blk enc" data-k="tok"><rect x="230" y="70" width="110" height="100" rx="4"/><text x="285" y="108" data-i18n="svTok"></text><text class="s" x="285" y="124">1024 × 1152</text><text class="s" x="285" y="140" data-i18n="svPos"></text></g>
+    <g class="blk dec" data-k="tf"><rect x="360" y="40" width="160" height="156" rx="4"/><text x="440" y="70" data-i18n="svTf"></text><text class="s" x="440" y="96" data-i18n="svSelf"></text><text class="s" x="440" y="114" data-i18n="svTxtAttn"></text><text class="s" x="440" y="132" data-i18n="svMlp"></text><text class="s" x="440" y="150" data-i18n="svAda"></text></g>
+    <g class="blk enc" data-k="unpatch"><rect x="540" y="70" width="70" height="100" rx="4"/><text x="575" y="116" data-i18n="svUnp1"></text><text class="s" x="575" y="132" data-i18n="svUnp2"></text></g>
+    <g class="blk io" data-k="out"><rect x="620" y="70" width="90" height="100" rx="4"/><text x="665" y="116" data-i18n="svOut"></text><text class="s" x="665" y="132">ε̂ 64×64×4</text></g>
+    <g class="blk" data-k="cond"><rect x="360" y="236" width="160" height="44" rx="4"/><text x="440" y="256" data-i18n="svCond"></text><text class="s" x="440" y="271">T5 / CLIP</text></g>
+  </svg>
+  </div>
+  <div class="card" id="detail" aria-live="polite"></div>
+</section>
+
+<section aria-labelledby="ex">
+  <div class="eyebrow" data-i18n="part3"></div>
+  <h2 id="ex" data-i18n="exH"></h2>
+  <p class="col" data-i18n="exP"></p>
+  <div class="prompts" id="prompts" role="group"></div>
+  <div class="stage" style="background:var(--panel)">
+    <div class="triple">
+      <figure><canvas id="gX" width="48" height="48"></canvas><figcaption data-i18n="capGX"></figcaption></figure>
+      <figure><canvas id="gE" width="48" height="48"></canvas><figcaption data-i18n="capGE"></figcaption></figure>
+      <figure><canvas id="g0" width="48" height="48"></canvas><figcaption data-i18n="capG0"></figcaption></figure>
+    </div>
+    <div class="strip" id="strip"></div>
+    <div class="controls">
+      <div class="grow"><label for="gStep" class="num" data-i18n="steps"></label><input id="gStep" type="range" min="0" max="50" value="0"><span class="num" id="gStepNum">0/50 · t=1000</span></div>
+      <div class="grow" style="flex-basis:200px"><label for="gW" class="num" data-i18n="guidance"></label><input id="gW" type="range" min="0" max="6" step="0.5" value="2"><span class="num" id="gWNum">2.0</span></div>
+      <button id="gSeed" data-i18n="gSeed"></button>
+      <button id="gPlay" class="primary" data-i18n="gPlay"></button>
+    </div>
+  </div>
+  <p class="note col" data-i18n="exNote1"></p>
+  <p class="note col" data-i18n="exNote2"></p>
+</section>
+
+<footer>
+  <span data-i18n="refs"></span>
+  <span><a href="https://github.com/ShaneM73/diffusion-models-demo" data-i18n="src"></a> · MIT License</span>
+</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+"use strict";
+// ================= i18n =================
+const STR={
+en:{
+ eyebrow:'Diffusion Models · Interactive Guide',
+ h1:'Pulling a picture out of noise',
+ lede:'A diffusion model learns to undo the process of adding noise to an image. In the 3D space below, <span class="sig">teal</span> marks the thin sheet where real data lives (the manifold), and <span class="noi">orange</span> marks noise. Drag to rotate, scrub the time step, or let the model generate from a cloud of noise.',
+ timestep:'Time step', btnNoise:'Play noising', btnGen:'Generate from noise', btnArrows:'Show denoising direction',
+ modeFwd:'Forward: add noise', modeGen:'Reverse: generate', threeAria:'3D point cloud: data manifold and the diffusion process',
+ lg1:'Close to real data', lg2:'Close to pure noise', lg3:'Where real data lives (the rolled-up sheet)',
+ note3d:'This is a 3D toy. A 512×512 color image has about 786,000 numbers, so it is one point in a 786,000-dimensional space, but the idea is the same: real images occupy a very thin region and almost everywhere else is noise. After you press “Generate from noise”, scrub the time step to replay the process.',
+ noWebGL:'The 3D view needs WebGL, which did not load in this browser. The rest of the page still works.',
+ part1:'Part 1', mathH:'The math',
+ m1h:'1. Adding noise: one formula reaches any step',
+ m1p:'Think of each step as mixing a drink: one part image, one part noise. <span class="sig">√ᾱ<sub>t</sub></span> controls how much of the original image remains, and <span class="noi">√(1−ᾱ<sub>t</sub>)</span> controls how much noise there is. Their squares always add up to 1, so the overall “energy” of the image stays constant.',
+ capX0:'Image x₀', capEps:'Noise ε', capXt:'Mix xₜ', coefS:'Image coefficient', coefN:'Noise coefficient',
+ chartNote:'Linear noise schedule: β rises evenly from 0.0001 to 0.02 over 1000 steps. At step 1000 the image coefficient is only about 0.006.',
+ chartS:'√ᾱ image', chartN:'√(1−ᾱ) noise', chartAria:'How the two coefficients change over time steps',
+ m2h:'2. The training objective: guess the noise that was added',
+ m2p:'The network ε<sub>θ</sub> looks at the noisy image x<sub>t</sub>, the time step t and the text c, and outputs the noise it thinks was added. The loss is the squared difference between that prediction and the true noise.',
+ code:'<span class="cm"># one training iteration</span>\nx0   = sample_images()  <span class="cm"># encoded to latent space, e.g. 64×64×4</span>\nc    = text_encoder(captions)  <span class="cm"># replaced by empty text 10% of the time, for guidance</span>\nt    = randint(1, 1000)\neps  = randn_like(x0)\nxt   = sqrt(abar[t]) * x0 + sqrt(1 - abar[t]) * eps\nloss = mse(model(xt, t, c), eps)\nloss.backward(); optimizer.step()  <span class="cm"># repeat hundreds of thousands to millions of times</span>',
+ m3h:'3. Why this objective is correct',
+ m3p1:'<b>It comes from maximum likelihood.</b> We want the probability p<sub>θ</sub>(x<sub>0</sub>) of generating real images to be as high as possible. It cannot be computed directly, so we derive a lower bound, the ELBO. Plugging in the diffusion process splits the bound into one KL-divergence term per step, and the KL between two Gaussians simplifies to exactly “predicted noise − true noise” squared, times a weight. The DDPM paper found that dropping the weight works better, which gives the loss above.',
+ m3p2:'<b>It also follows from Tweedie’s formula.</b> The minimizer of a squared error is the conditional expectation. For data corrupted by Gaussian noise:',
+ m3p3:'The gradient on the right is called the “score”. It points toward higher probability, which means “toward real images”. Minimizing the loss teaches the network this direction. The “denoising direction” arrows in the 3D demo draw exactly this.',
+ m4h:'4. Generation: walking back from t = 1000',
+ m4p1:'Start from pure noise x<sub>T</sub>. Each step removes part of the predicted noise and adds back a little fresh randomness (DDPM):',
+ m4p2:'The demos on this page use DDIM instead: estimate the original image x̂<sub>0</sub>, then remix it to the next noise level with formula 1. DDIM can skip steps, so 50 steps are enough.',
+ m5h:'5. Text guidance (classifier-free guidance)',
+ m5p:'Run the network twice per step, once with the text and once without. Amplifying the difference by a factor w makes the image follow the description more closely; too large a w oversaturates the colors.',
+ mathNote:'The math guarantees the objective is right: at the minimum of the loss, the learned direction is correct. Whether gradient descent actually finds parameters that good has no rigorous proof. That part is established by experiment.',
+ part2:'Part 2', archH:'What the network looks like inside',
+ archP:'Both architectures have the same inputs and outputs: a noisy image (64×64×4 in latent space), the time step and the text go in, and a noise prediction of the same size comes out. Click any block in the diagram for an explanation.',
+ tabU:'U-Net (Stable Diffusion 1.x / 2.x / XL)', tabD:'DiT (SD3, Sora and similar)',
+ svSkip:'Skip connections carry detail straight across', svEvery:'→ added to every block', svCross:'cross-attention',
+ svIn:'Noisy input', svE1:'Encoder 1', svE2:'Encoder 2', svE3:'Encoder 3', svMid:'Bottleneck', svD3:'Decoder 3', svD2:'Decoder 2', svD1:'Decoder 1', svOut:'Predicted noise',
+ svTime:'Time step t → vector', svText:'Text encoder', svPatch:'Patchify', svTok:'Token sequence', svPos:'+ position', svTf:'Transformer block ×28',
+ svSelf:'self-attention', svTxtAttn:'text attention', svMlp:'MLP', svAda:'adaLN: t, text modulation', svUnp1:'Unpatchify', svUnp2:'to full size', svCond:'Time step t + text',
+ part3:'Part 3', exH:'Example: how an image emerges',
+ exP:'Pick a description and press “Generate”. The middle panel is what the network actually outputs at every step: its guess of the noise. On the left, the current image after removing noise; on the right, its current guess of the clean image. Early on it can only guess a blurry color layout. It becomes more certain as the steps go on.',
+ capGX:'Current image xₜ', capGE:'Network output: predicted noise ε̂', capG0:'Guessed clean image x̂₀',
+ steps:'Step', guidance:'Guidance w', gSeed:'New random start', gPlay:'Generate', jump:'Jump to step ',
+ exNote1:'Try pulling w down to 0: the model ignores the text and may draw any category. Push it to 6: colors oversaturate, which is exactly what strong guidance looks like in real models. A new random start gives a different image for the same prompt.',
+ exNote2:'Note: the “network” here is an ideal denoiser that computes the optimal answer directly against a dataset of 40 tiny images, so its results always land near images from that dataset. A real model has no dataset to look things up in. It has to learn this answer with hundreds of millions of parameters, and it can combine what it learned into images it has never seen.',
+ refs:'References: Ho et al. 2020 (DDPM) · Song et al. 2021 (DDIM, score matching) · Rombach et al. 2022 (latent diffusion) · Peebles & Xie 2023 (DiT) · Ho & Salimans 2022 (classifier-free guidance)',
+ src:'Source on GitHub',
+ promptsAria:'Text prompt',
+ classes:['Sunset over the sea','Snowy peaks under the moon','A red house','Cactus in the desert']
+},
+zh:{
+ eyebrow:'Diffusion Models · 交互讲解',
+ h1:'从噪声里推出一张图',
+ lede:'扩散模型先学会“往图里加噪声”的反过程。下面的三维空间里，<span class="sig">青色</span>是真实数据所在的薄片（流形），<span class="noi">橙色</span>代表噪声。拖动视角，拉动时间步，或者让模型从一团噪声开始生成。',
+ timestep:'时间步', btnNoise:'播放加噪', btnGen:'从噪声生成', btnArrows:'显示去噪方向',
+ modeFwd:'正向：加噪', modeGen:'反向：生成', threeAria:'三维点云：数据流形与扩散过程',
+ lg1:'接近真实数据', lg2:'接近纯噪声', lg3:'真实数据的位置（卷起来的纸）',
+ note3d:'这是一个三维玩具。一张 512×512 的彩色图有 78 万个数字，是 78 万维空间里的一个点，但道理完全一样：真实图片只占很薄的一片，其他地方几乎全是噪声。“从噪声生成”后，可以拖动时间步来回看生成过程。',
+ noWebGL:'三维视图需要 WebGL，当前浏览器没有加载成功。下面的内容不受影响。',
+ part1:'第一部分', mathH:'数学原理',
+ m1h:'1. 加噪：一个公式就能算出任意一步',
+ m1p:'每一步都像调饮料：原图占一份，噪声占一份。<span class="sig">√ᾱ<sub>t</sub></span> 管原图占多少，<span class="noi">√(1−ᾱ<sub>t</sub>)</span> 管噪声占多少。两者平方加起来等于 1，所以图的整体“能量”不变。',
+ capX0:'原图 x₀', capEps:'噪声 ε', capXt:'混合 xₜ', coefS:'原图系数', coefN:'噪声系数',
+ chartNote:'线性噪声表：β 从 0.0001 均匀增加到 0.02，共 1000 步。第 1000 步时原图系数只剩约 0.006。',
+ chartS:'√ᾱ 原图', chartN:'√(1−ᾱ) 噪声', chartAria:'两个系数随时间步变化的曲线',
+ m2h:'2. 训练目标：猜出加进去的噪声',
+ m2p:'网络 ε<sub>θ</sub> 看着带噪图 x<sub>t</sub>、时间步 t 和文字 c，输出它认为加进去的噪声。损失就是预测和真实噪声的平方差。',
+ code:'<span class="cm"># 一次训练迭代</span>\nx0   = 取一批图片(压到潜空间)        <span class="cm"># 例如 64×64×4</span>\nc    = 文本编码器(配套文字)          <span class="cm"># 10% 概率换成空文字，为引导做准备</span>\nt    = 随机整数(1, 1000)\neps  = 标准正态随机数(形状同 x0)\nxt   = sqrt(abar[t]) * x0 + sqrt(1 - abar[t]) * eps\nloss = 均方误差(网络(xt, t, c), eps)\nloss.反向传播();  优化器.走一小步()     <span class="cm"># 重复几十万到上百万次</span>',
+ m3h:'3. 为什么这个目标是对的',
+ m3p1:'<b>来自最大似然。</b>我们想让模型生成真实图片的概率 p<sub>θ</sub>(x<sub>0</sub>) 尽量大。它没法直接算，于是推一个下界 ELBO。把扩散过程代进去，下界拆成每一步一项 KL 散度；两个高斯分布之间的 KL 化简后，正好是“预测噪声 − 真实噪声”的平方，前面带个权重。DDPM 论文发现去掉权重效果更好，就成了上面的损失。',
+ m3p2:'<b>来自 Tweedie 公式。</b>平方误差的最优解是条件期望。对带高斯噪声的数据有：',
+ m3p3:'右边的梯度叫“分数”，指向概率最高的方向，也就是“往真图那边走”。损失降到最低，网络就学会了这个方向。三维演示里的“去噪方向”箭头画的就是它。',
+ m4h:'4. 生成：从 t = 1000 往回走',
+ m4p1:'从纯噪声 x<sub>T</sub> 出发，每一步减掉一部分预测噪声，再补一点新的随机性（DDPM）：',
+ m4p2:'这页的演示用的是 DDIM：先估出原图 x̂<sub>0</sub>，再按公式 1 混回下一步的噪声水平，可以跳步，50 步就够。',
+ m5h:'5. 文字引导（无分类器引导）',
+ m5p:'同一步算两次：一次带文字，一次不带。把两者的差放大 w 倍，图会更贴近描述；w 太大颜色会过饱和。',
+ mathNote:'数学保证的是“目标对”：只要损失最小，学到的方向就正确。至于梯度下降能不能真的找到那么好的参数，没有严格证明，靠的是大量实验。',
+ part2:'第二部分', archH:'网络内部长什么样',
+ archP:'两种结构的输入输出完全相同：输入带噪图（潜空间里 64×64×4）、时间步和文字，输出一张同样大小的噪声预测。点击图里的模块看说明。',
+ tabU:'U-Net（Stable Diffusion 1.x / 2.x / XL）', tabD:'DiT（SD3、Sora 一类）',
+ svSkip:'跳跃连接：把细节直接送到右边', svEvery:'→ 加到每个模块', svCross:'交叉注意力',
+ svIn:'带噪输入', svE1:'编码 1', svE2:'编码 2', svE3:'编码 3', svMid:'瓶颈', svD3:'解码 3', svD2:'解码 2', svD1:'解码 1', svOut:'预测噪声',
+ svTime:'时间步 t → 向量', svText:'文字编码器', svPatch:'切成小块', svTok:'词元序列', svPos:'+ 位置编码', svTf:'Transformer 块 ×28',
+ svSelf:'自注意力', svTxtAttn:'文字注意力', svMlp:'前馈 MLP', svAda:'adaLN：t、文字调制', svUnp1:'拼回', svUnp2:'原尺寸', svCond:'时间步 t + 文字',
+ part3:'第三部分', exH:'例子：一张图是怎么“浮现”的',
+ exP:'选一句描述，按“生成”。中间那格就是网络每一步真正输出的东西：它猜的噪声。左边减掉噪声，右边是它此刻猜测的原图。前几步它只能猜出模糊的颜色分布，越往后越确定。',
+ capGX:'当前图 xₜ', capGE:'网络输出：预测噪声 ε̂', capG0:'猜测的原图 x̂₀',
+ steps:'步数', guidance:'引导 w', gSeed:'换个随机起点', gPlay:'生成', jump:'跳到第 ',
+ exNote1:'试试把 w 拉到 0：模型不看文字，可能画出任何一类。拉到 6：颜色变得过饱和，这正是真实模型里引导太强的样子。换随机起点，同一句话会得到不同的图。',
+ exNote2:'说明：这里的“网络”是理想去噪器，它直接对照一个 40 张小图的数据集算出最优答案，所以结果只会落在数据集的图附近。真实模型没有数据集可查，要靠几亿参数把这个答案学出来，而且能组合出从没见过的新图。',
+ refs:'参考：Ho et al. 2020（DDPM）· Song et al. 2021（DDIM、分数匹配）· Rombach et al. 2022（潜空间扩散）· Peebles & Xie 2023（DiT）· Ho & Salimans 2022（无分类器引导）',
+ src:'GitHub 源代码',
+ promptsAria:'文字描述',
+ classes:['海上日落','雪山明月','红房子','沙漠仙人掌']
+}};
+const INFO={
+en:{
+ in:['Noisy input','A 512×512 image is first compressed by a VAE encoder into a 64×64×4 latent, then noised with the formula. The network works entirely in this small space; at the end a VAE decoder enlarges the result back into a picture.'],
+ e1:['Encoder 1 (high resolution)','A few residual convolution blocks that look at local edges and textures. Each block also has self-attention and cross-attention. At the end it downsamples: size halves, channels double.'],
+ e2:['Encoder 2','Lower resolution, so each position covers a larger area. It starts to see structure like “this region is sky, that region is ground”.'],
+ e3:['Encoder 3','Compressed further; the features become more abstract, close to the level of “there is a cat here”.'],
+ mid:['Bottleneck','The lowest resolution (8×8). Its view covers the whole image and decides the overall composition. Attention is cheapest here, and matters most.'],
+ d3:['Decoder 3','Upsampling enlarges the feature map while concatenating the features passed across from the same level on the left.'],
+ d2:['Decoder 2','Keeps enlarging. Thanks to skip connections, detail lost during compression is recovered here.'],
+ d1:['Decoder 1','Back to 64×64. A final convolution turns the channels back into 4, producing the noise prediction.'],
+ out:['Predicted noise ε̂','Exactly the same size as the input. During training it is compared with the true noise using mean squared error; during generation it is used to denoise.'],
+ time:['Time-step embedding','The integer t is turned into a sinusoidal code, passed through a small MLP into a vector, and added inside every residual block. This tells the network how noisy the input is, so it knows whether to draw the broad layout or refine detail.'],
+ text:['Text encoder + cross-attention','The text is first encoded by CLIP or T5 into a sequence of vectors. In cross-attention, every image position produces a query Q and the text vectors produce keys K and values V, so each position can “look at” the words relevant to it.'],
+ patch:['Patchify','The 64×64 latent is cut into 2×2 patches, 32×32 = 1024 of them. Each patch is flattened and linearly projected into a vector that acts like a “word”.'],
+ tok:['Token sequence','1024 tokens, each a 1152-dimensional vector (DiT-XL), plus a positional encoding that records where each patch came from.'],
+ tf:['Transformer block','The same structure as a language model. Self-attention lets every patch see every other patch; text enters through attention (SD3 places image and text tokens together in joint attention); adaLN uses the time step and text to compute scale and shift factors that modulate every layer. Larger models work better, and it scales more easily than a U-Net.'],
+ unpatch:['Unpatchify','Each token is projected back to 2×2×4 values, and the patches are reassembled by position into 64×64×4.'],
+ cond:['Conditioning','A global vector from the time step and text drives the adaLN modulation; the per-word text vectors are used in attention.']},
+zh:{
+ in:['带噪输入','一张 512×512 的图先被 VAE 编码器压成 64×64×4 的潜变量，再按公式加噪。网络全程在这个小空间里工作，最后再用 VAE 解码器放大回图片。'],
+ e1:['编码 1（高分辨率）','几个残差卷积块，看局部的边缘和纹理。每个块里还有自注意力和交叉注意力。结束时下采样，尺寸减半，通道翻倍。'],
+ e2:['编码 2','分辨率更低，每个位置覆盖的范围更大，开始看到“这一块是天空、那一块是地面”这样的结构。'],
+ e3:['编码 3','进一步压缩，特征更抽象，接近“这里有一只猫”的语义层面。'],
+ mid:['瓶颈','分辨率最低（8×8），视野覆盖全图，决定整体构图。这里的注意力最便宜，也最重要。'],
+ d3:['解码 3','上采样把尺寸放大，同时把左边同一层传来的特征拼接进来。'],
+ d2:['解码 2','继续放大。因为有跳跃连接，压缩时丢掉的细节在这里被找回。'],
+ d1:['解码 1','回到 64×64，再用一层卷积把通道数变回 4，得到噪声预测。'],
+ out:['预测噪声 ε̂','和输入大小完全一样。训练时拿它和真实噪声算均方误差；生成时用它去噪。'],
+ time:['时间步嵌入','把整数 t 变成正弦编码，再经过一个小 MLP 变成向量，加到每个残差块里。网络靠它知道“现在噪声有多大”，从而决定是该画大轮廓还是修细节。'],
+ text:['文字编码器 + 交叉注意力','文字先被 CLIP 或 T5 编码成一串向量。交叉注意力里，图上每个位置生成查询 Q，文字向量生成键 K 和值 V，于是每个位置都能去“看”和自己有关的词。'],
+ patch:['切成小块','把 64×64 的潜变量切成 2×2 的小方块，共 32×32 = 1024 块，每块拉平后线性映射成一个向量，相当于一个“词”。'],
+ tok:['词元序列','1024 个词元，每个是 1152 维向量（DiT-XL），再加上位置编码，告诉模型每块原来在哪。'],
+ tf:['Transformer 块','和语言模型同一种结构：自注意力让所有小块互相看；文字通过注意力接入（SD3 把图和文字的词元放在一起做联合注意力）；adaLN 用时间步和文字算出缩放和平移系数，调制每一层。模型越大效果越好，扩展性比 U-Net 更强。'],
+ unpatch:['拼回原尺寸','每个词元映射回 2×2×4 的数值，再按位置拼回 64×64×4。'],
+ cond:['条件信息','时间步和文字的全局向量用于 adaLN 调制；文字的逐词向量用于注意力。']}};
+
+function initialLang(){
+  try{const q=new URLSearchParams(location.search).get('lang');if(q==='zh'||q==='en')return q;}catch(e){}
+  if(location.hash==='#zh')return 'zh';
+  try{const s=localStorage.getItem('dm-lang');if(s==='zh'||s==='en')return s;}catch(e){}
+  return 'en';
+}
+let LANG=initialLang();
+const S=k=>STR[LANG][k];
+const langHooks=[];
+function applyLang(){
+  document.documentElement.lang=LANG==='zh'?'zh-CN':'en';
+  document.title=LANG==='zh'?'扩散模型实验室':'Diffusion Models Lab';
+  document.querySelectorAll('[data-i18n]').forEach(el=>{const v=S(el.dataset.i18n);if(v==null)return;
+    if(el.namespaceURI==='http://www.w3.org/2000/svg')el.textContent=v;else el.innerHTML=v;});
+  document.getElementById('lang-en').setAttribute('aria-pressed',LANG==='en');
+  document.getElementById('lang-zh').setAttribute('aria-pressed',LANG==='zh');
+  document.getElementById('three').setAttribute('aria-label',S('threeAria'));
+  document.getElementById('chart').setAttribute('aria-label',S('chartAria'));
+  langHooks.forEach(f=>{try{f()}catch(e){console.error(e)}});
+}
+function setLang(l){LANG=l;try{localStorage.setItem('dm-lang',l);}catch(e){}applyLang();}
+document.getElementById('lang-en').addEventListener('click',()=>setLang('en'));
+document.getElementById('lang-zh').addEventListener('click',()=>setLang('zh'));
+
+// ================= shared =================
+const T=1000, AB=new Float64Array(T+1);
+AB[0]=1; for(let k=1;k<=T;k++){const b=1e-4+(0.02-1e-4)*(k-1)/(T-1);AB[k]=AB[k-1]*(1-b);}
+function rng(seed){let a=seed>>>0;return function(){a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;}}
+function gauss(r){let u=0;while(u===0)u=r();return Math.sqrt(-2*Math.log(u))*Math.cos(6.283185307*r());}
+const reduceMotion=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+const themeListeners=[];
+function onTheme(f){themeListeners.push(f);}
+function fireTheme(){themeListeners.forEach(f=>{try{f()}catch(e){}});}
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',fireTheme);}catch(e){}
+new MutationObserver(fireTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+// ================= 3D demo =================
+const N_DATA=2400,N_P=900,N_ARROW=160;
+const D=new Float32Array(N_DATA*3);
+(function(){const r=rng(7);for(let i=0;i<N_DATA;i++){const th=1.5*Math.PI+3*Math.PI*r();const h=(r()*2-1)*1.1;
+  D[3*i]=th*Math.cos(th)/9;D[3*i+1]=h;D[3*i+2]=th*Math.sin(th)/9;}})();
+const L=new Float64Array(N_DATA);
+function denoise3(x,y,z,ab,out){const sa=Math.sqrt(ab),inv=1/(2*(1-ab));let m=-Infinity;
+  for(let j=0;j<N_DATA;j++){const dx=x-sa*D[3*j],dy=y-sa*D[3*j+1],dz=z-sa*D[3*j+2];const l=-(dx*dx+dy*dy+dz*dz)*inv;L[j]=l;if(l>m)m=l;}
+  let s=0,ox=0,oy=0,oz=0;for(let j=0;j<N_DATA;j++){const w=Math.exp(L[j]-m);s+=w;ox+=w*D[3*j];oy+=w*D[3*j+1];oz+=w*D[3*j+2];}
+  out[0]=ox/s;out[1]=oy/s;out[2]=oz/s;}
+
+const host=document.getElementById('three');
+let three=null;
+if(window.THREE){try{three=initThree();}catch(e){console.error(e);}}
+if(!three){const p=document.createElement('p');p.style.cssText='padding:24px;color:var(--muted)';host.appendChild(p);langHooks.push(()=>{p.textContent=S('noWebGL');});}
+
+function initThree(){
+  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));renderer.setClearColor(0x000000,0);
+  host.appendChild(renderer.domElement);
+  const scene=new THREE.Scene();
+  const cam=new THREE.PerspectiveCamera(45,1,0.1,100);cam.position.set(3.6,2.4,4.4);
+  const ctr=new THREE.OrbitControls(cam,renderer.domElement);ctr.enableDamping=true;ctr.enablePan=false;ctr.minDistance=2.5;ctr.maxDistance=10;
+  ctr.autoRotate=!reduceMotion;ctr.autoRotateSpeed=0.6;
+  function dotTex(){const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');const gr=g.createRadialGradient(32,32,0,32,32,30);
+    gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.55,'rgba(255,255,255,.95)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,64,64);return new THREE.CanvasTexture(c);}
+  const tex=dotTex();
+  const gg=new THREE.BufferGeometry();gg.setAttribute('position',new THREE.BufferAttribute(D,3));
+  const gm=new THREE.PointsMaterial({size:0.035,map:tex,transparent:true,opacity:0.35,depthWrite:false});
+  scene.add(new THREE.Points(gg,gm));
+  const pos=new Float32Array(N_P*3),col=new Float32Array(N_P*3);
+  const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pos,3));pg.setAttribute('color',new THREE.BufferAttribute(col,3));
+  const pm=new THREE.PointsMaterial({size:0.075,map:tex,vertexColors:true,transparent:true,depthWrite:false,alphaTest:0.05});
+  scene.add(new THREE.Points(pg,pm));
+  const apos=new Float32Array(N_ARROW*6);const ag=new THREE.BufferGeometry();ag.setAttribute('position',new THREE.BufferAttribute(apos,3));
+  const am=new THREE.LineBasicMaterial({transparent:true,opacity:0.85});const arrows=new THREE.LineSegments(ag,am);arrows.visible=false;scene.add(arrows);
+  const box=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(5,5,5)),new THREE.LineBasicMaterial({transparent:true,opacity:0.12}));scene.add(box);
+
+  const cS=new THREE.Color(),cN=new THREE.Color(),cTmp=new THREE.Color();
+  function readColors(){cS.set(cssVar('--signal')||'#0e7a73');cN.set(cssVar('--noise')||'#d4602a');gm.color.set(cssVar('--muted')||'#888');
+    am.color.set(cssVar('--ink')||'#335');box.material.color.set(cssVar('--muted')||'#888');paint();}
+  onTheme(readColors);
+
+  const r=rng(11);const X0=new Float32Array(N_P*3),EPS=new Float32Array(N_P*3);
+  for(let i=0;i<N_P;i++){const j=Math.floor(r()*N_DATA);X0[3*i]=D[3*j];X0[3*i+1]=D[3*j+1];X0[3*i+2]=D[3*j+2];for(let k=0;k<3;k++)EPS[3*i+k]=gauss(r);}
+
+  let mode='fwd',curT=0,hist=null,histT=null,showArrows=false;
+  const slider=document.getElementById('tSlider'),abNum=document.getElementById('abNum'),tChip=document.getElementById('tChip'),modeChip=document.getElementById('modeChip');
+  function paint(){const ab=AB[curT];const s=Math.sqrt(ab);cTmp.copy(cN).lerp(cS,Math.pow(s,0.7));
+    for(let i=0;i<N_P;i++){col[3*i]=cTmp.r;col[3*i+1]=cTmp.g;col[3*i+2]=cTmp.b;}pg.attributes.color.needsUpdate=true;}
+  function setFwd(t){const sa=Math.sqrt(AB[t]),s1=Math.sqrt(1-AB[t]);for(let i=0;i<3*N_P;i++)pos[i]=sa*X0[i]+s1*EPS[i];}
+  const tmp=[0,0,0];
+  function updArrows(){if(!showArrows)return;const ab=AB[curT];if(curT===0){arrows.visible=false;return;}arrows.visible=true;const sa=Math.sqrt(ab);
+    for(let i=0;i<N_ARROW;i++){const x=pos[3*i],y=pos[3*i+1],z=pos[3*i+2];denoise3(x,y,z,ab,tmp);
+      let dx=sa*tmp[0]-x,dy=sa*tmp[1]-y,dz=sa*tmp[2]-z;const len=Math.hypot(dx,dy,dz)||1;const k=Math.min(0.32,len*0.5)/len;
+      apos[6*i]=x;apos[6*i+1]=y;apos[6*i+2]=z;apos[6*i+3]=x+dx*k;apos[6*i+4]=y+dy*k;apos[6*i+5]=z+dz*k;}
+    ag.attributes.position.needsUpdate=true;}
+  function show(t){curT=t;
+    if(mode==='fwd')setFwd(t);else{let best=0,bd=1e9;for(let k=0;k<histT.length;k++){const d=Math.abs(histT[k]-t);if(d<bd){bd=d;best=k;}}pos.set(hist[best]);}
+    pg.attributes.position.needsUpdate=true;paint();updArrows();
+    slider.value=t;tChip.textContent='t = '+t;abNum.textContent='ᾱ = '+AB[t].toFixed(3);}
+  function setMode(m){mode=m;modeChip.textContent=S(m==='fwd'?'modeFwd':'modeGen');modeChip.className='chip '+(m==='fwd'?'on-noi':'on-sig');}
+  langHooks.push(()=>setMode(mode));
+
+  let anim=null;
+  slider.addEventListener('input',()=>{anim=null;show(+slider.value);});
+  document.getElementById('btnNoise').addEventListener('click',()=>{setMode('fwd');anim={kind:'fwd',t0:performance.now()};});
+  document.getElementById('btnArrows').addEventListener('click',e=>{showArrows=!showArrows;e.currentTarget.setAttribute('aria-pressed',showArrows);if(!showArrows)arrows.visible=false;updArrows();});
+  document.getElementById('btnGen').addEventListener('click',()=>{
+    const SS=40,ts=[];for(let k=0;k<=SS;k++)ts.push(Math.round(T*(1-k/SS)));
+    const rr=rng((Math.random()*1e9)|0);const x=new Float32Array(N_P*3);for(let i=0;i<x.length;i++)x[i]=gauss(rr);
+    hist=[x.slice()];histT=[T];setMode('gen');show(T);anim={kind:'gen',k:0,ts,x,last:0};});
+
+  function stepGen(a){const t=a.ts[a.k],tn=a.ts[a.k+1],ab=AB[t],abn=AB[tn],sa=Math.sqrt(ab),s1=Math.sqrt(1-ab),san=Math.sqrt(abn),s1n=Math.sqrt(1-abn);const x=a.x;
+    for(let i=0;i<N_P;i++){denoise3(x[3*i],x[3*i+1],x[3*i+2],ab,tmp);for(let k=0;k<3;k++){const e=(x[3*i+k]-sa*tmp[k])/s1;x[3*i+k]=san*tmp[k]+s1n*e;}}
+    a.k++;hist.push(x.slice());histT.push(tn);show(tn);}
+
+  function resize(){const w=host.clientWidth,h=host.clientHeight;renderer.setSize(w,h,false);renderer.domElement.style.width='100%';renderer.domElement.style.height='100%';cam.aspect=w/h;cam.updateProjectionMatrix();}
+  new ResizeObserver(resize).observe(host);resize();
+  setMode('fwd');readColors();show(0);
+  function loop(now){requestAnimationFrame(loop);
+    if(anim){if(anim.kind==='fwd'){const p=Math.min(1,(now-anim.t0)/3500);show(Math.round(T*p*p));if(p>=1)anim=null;}
+      else if(anim.kind==='gen'){if(now-anim.last>70){anim.last=now;stepGen(anim);if(anim.k>=anim.ts.length-1)anim=null;}}}
+    ctr.update();renderer.render(scene,cam);}
+  requestAnimationFrame(loop);
+  return true;
+}
+
+// ================= image dataset =================
+const W=48,DIM=W*W*3;
+const off=document.createElement('canvas');off.width=off.height=W;const oc=off.getContext('2d',{willReadFrequently:true});
+function hsl(h,s,l){return `hsl(${h},${s}%,${l}%)`;}
+function tri(ax,ay,bx,by,cx,cy,f){oc.beginPath();oc.moveTo(ax,ay);oc.lineTo(bx,by);oc.lineTo(cx,cy);oc.closePath();oc.fillStyle=f;oc.fill();}
+function circ(x,y,r,f){oc.beginPath();oc.arc(x,y,r,0,7);oc.fillStyle=f;oc.fill();}
+const DRAW=[
+ function(r){const h=24+r()*9;let g=oc.createLinearGradient(0,0,0,h);g.addColorStop(0,hsl(255+r()*25,45,26+r()*8));g.addColorStop(1,hsl(18+r()*18,92,58+r()*8));oc.fillStyle=g;oc.fillRect(0,0,W,h);
+   const sx=8+r()*32,sr=4+r()*4;circ(sx,h-2-r()*8,sr,hsl(42+r()*10,100,72));oc.fillStyle=hsl(222,48,18+r()*10);oc.fillRect(0,h,W,W-h);
+   oc.fillStyle=hsl(30,90,60);for(let i=0;i<5;i++){oc.globalAlpha=.7-i*.12;oc.fillRect(sx-sr+i,h+2+i*3,2*sr-2*i,1.4);}oc.globalAlpha=1;},
+ function(r){let g=oc.createLinearGradient(0,0,0,W);g.addColorStop(0,hsl(225,55,10+r()*6));g.addColorStop(1,hsl(215,40,30+r()*8));oc.fillStyle=g;oc.fillRect(0,0,W,W);
+   circ(6+r()*36,6+r()*9,3+r()*3,'#f3efd6');const n=2+Math.floor(r()*2);
+   for(let i=0;i<n;i++){const px=6+r()*36,py=12+r()*14,hw=14+r()*12;tri(px-hw,W,px,py,px+hw,W,hsl(212,18,38+i*8));const c=(W-py)*0.28;tri(px-hw*c/(W-py),py+c,px,py,px+hw*c/(W-py),py+c,'#eef3f6');}
+   oc.fillStyle=hsl(210,30,12);oc.fillRect(0,W-5,W,5);},
+ function(r){oc.fillStyle=hsl(200+r()*12,70,72+r()*8);oc.fillRect(0,0,W,W);const gy=32+r()*6;oc.fillStyle=hsl(100+r()*25,45,38+r()*8);oc.fillRect(0,gy,W,W-gy);
+   const left=r()<.5;const hw=12+r()*6,hh=9+r()*4,hx=left?4+r()*8:W-hw-4-r()*8;oc.fillStyle=hsl(2+r()*8,75,46);oc.fillRect(hx,gy-hh,hw,hh);
+   tri(hx-2,gy-hh,hx+hw/2,gy-hh-7-r()*3,hx+hw+2,gy-hh,hsl(15,45,25));oc.fillStyle=hsl(30,40,22);oc.fillRect(hx+hw/2-1.5,gy-5,3,5);
+   const tx=left?W-10-r()*10:8+r()*10;oc.fillStyle=hsl(25,40,25);oc.fillRect(tx-1.2,gy-9,2.4,9);circ(tx,gy-12,5+r()*3,hsl(120,45,28+r()*8));circ(left?6:W-6,6,3.5,hsl(50,100,62));},
+ function(r){let g=oc.createLinearGradient(0,0,0,W);g.addColorStop(0,hsl(195,60,70+r()*8));g.addColorStop(1,hsl(30,80,82));oc.fillStyle=g;oc.fillRect(0,0,W,W);
+   circ(8+r()*32,8+r()*6,5+r()*3,hsl(48,100,85));const dy=31+r()*5;oc.fillStyle=hsl(38,70,62+r()*8);oc.beginPath();oc.moveTo(0,dy);
+   oc.quadraticCurveTo(W*(.3+r()*.4),dy-6-r()*5,W,dy+r()*4);oc.lineTo(W,W);oc.lineTo(0,W);oc.closePath();oc.fill();
+   const cx=10+r()*28,ch=14+r()*8,c=hsl(130,40,30+r()*8);oc.fillStyle=c;oc.fillRect(cx-2,dy+6-ch,4,ch);oc.fillRect(cx-7,dy-ch*.55,3,6);oc.fillRect(cx-7,dy-ch*.55+4,6,2.5);oc.fillRect(cx+4,dy-ch*.75,3,7);oc.fillRect(cx+1,dy-ch*.75+5,6,2.5);}
+];
+const PER=10,IMGS=[],CLS=[];
+DRAW.forEach((draw,ci)=>{for(let v=0;v<PER;v++){const r=rng(1000+ci*97+v*13);oc.clearRect(0,0,W,W);draw(r);const d=oc.getImageData(0,0,W,W).data;const a=new Float32Array(DIM);
+  for(let p=0;p<W*W;p++)for(let k=0;k<3;k++)a[3*p+k]=d[4*p+k]/127.5-1;IMGS.push(a);CLS.push(ci);}});
+function drawArr(cv,arr,scale){const g=cv.getContext('2d');const im=g.createImageData(W,W);for(let p=0;p<W*W;p++){for(let k=0;k<3;k++){let v=arr[3*p+k]*(scale||1);v=(v+1)*127.5;im.data[4*p+k]=v<0?0:v>255?255:v;}im.data[4*p+3]=255;}g.putImageData(im,0,0);}
+
+// ================= mixer + chart =================
+(function(){const x0=IMGS[0],r=rng(5),eps=new Float32Array(DIM);for(let i=0;i<DIM;i++)eps[i]=gauss(r);
+  const xt=new Float32Array(DIM);const cx0=document.getElementById('mx0'),cxe=document.getElementById('mxe'),cxt=document.getElementById('mxt');
+  drawArr(cx0,x0);drawArr(cxe,eps,0.5);const sl=document.getElementById('mixT');
+  const chart=document.getElementById('chart');
+  function drawChart(t){const dpr=Math.min(2,window.devicePixelRatio||1),w=chart.clientWidth,h=chart.clientHeight;if(!w)return;chart.width=w*dpr;chart.height=h*dpr;const g=chart.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+    const fg=cssVar('--fg'),mu=cssVar('--muted'),ln=cssVar('--line'),cs=cssVar('--signal'),cn=cssVar('--noise');
+    const l=34,rt=w-12,tp=14,bt=h-28;const X=v=>l+(rt-l)*v/T,Y=v=>bt-(bt-tp)*v;
+    g.font='11px "JetBrains Mono",monospace';g.fillStyle=mu;g.strokeStyle=ln;g.lineWidth=1;
+    [0,.5,1].forEach(v=>{g.beginPath();g.moveTo(l,Y(v));g.lineTo(rt,Y(v));g.stroke();g.textAlign='right';g.fillText(v.toFixed(1),l-6,Y(v)+4);});
+    [0,250,500,750,1000].forEach(v=>{g.textAlign='center';g.fillText(v,X(v),bt+16);});
+    function curve(f,c){g.strokeStyle=c;g.lineWidth=2.2;g.beginPath();for(let k=0;k<=T;k+=5){const y=Y(f(k));k?g.lineTo(X(k),y):g.moveTo(X(k),y);}g.stroke();}
+    curve(k=>Math.sqrt(AB[k]),cs);curve(k=>Math.sqrt(1-AB[k]),cn);
+    g.strokeStyle=fg;g.lineWidth=1;g.setLineDash([3,3]);g.beginPath();g.moveTo(X(t),tp);g.lineTo(X(t),bt);g.stroke();g.setLineDash([]);
+    [[Math.sqrt(AB[t]),cs],[Math.sqrt(1-AB[t]),cn]].forEach(([v,c])=>{g.fillStyle=c;g.beginPath();g.arc(X(t),Y(v),4,0,7);g.fill();});
+    g.font='11px '+cssVar('--f-body');g.textAlign='left';g.fillStyle=cs;g.fillText(S('chartS'),X(40),Y(.93));g.fillStyle=cn;g.fillText(S('chartN'),X(40),Y(.12));}
+  function upd(){const t=+sl.value,sa=Math.sqrt(AB[t]),s1=Math.sqrt(1-AB[t]);for(let i=0;i<DIM;i++)xt[i]=sa*x0[i]+s1*eps[i];drawArr(cxt,xt);
+    document.getElementById('barS').style.width=(sa*100)+'%';document.getElementById('barN').style.width=(s1*100)+'%';
+    document.getElementById('numS').textContent=sa.toFixed(3);document.getElementById('numN').textContent=s1.toFixed(3);document.getElementById('mixTNum').textContent=t;
+    document.getElementById('sumNum').textContent=sa.toFixed(3)+'² + '+s1.toFixed(3)+'² = '+(sa*sa+s1*s1).toFixed(3);drawChart(t);}
+  sl.addEventListener('input',upd);new ResizeObserver(()=>drawChart(+sl.value)).observe(chart);onTheme(()=>drawChart(+sl.value));
+  langHooks.push(()=>drawChart(+sl.value));
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>drawChart(+sl.value));
+  upd();})();
+
+// ================= architecture =================
+const detail=document.getElementById('detail');
+let selK=null,selSvg=null;
+function pick(k,svg){selK=k;selSvg=svg;const it=INFO[LANG][k];if(!it)return;detail.innerHTML='';const h=document.createElement('h3');h.textContent=it[0];const p=document.createElement('p');p.textContent=it[1];detail.append(h,p);
+  document.querySelectorAll('.blk').forEach(b=>b.classList.toggle('sel',b.dataset.k===k&&b.closest('svg')===svg));}
+langHooks.push(()=>{if(selK)pick(selK,selSvg);});
+document.querySelectorAll('.blk').forEach(b=>{b.setAttribute('tabindex','0');b.setAttribute('role','button');
+  b.addEventListener('click',()=>pick(b.dataset.k,b.closest('svg')));b.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick(b.dataset.k,b.closest('svg'));}});});
+const tabU=document.getElementById('tabU'),tabD=document.getElementById('tabD'),dU=document.getElementById('diagU'),dD=document.getElementById('diagD');
+function tab(u){tabU.setAttribute('aria-selected',u);tabD.setAttribute('aria-selected',!u);dU.hidden=!u;dD.hidden=u;pick(u?'e1':'tf',(u?dU:dD).querySelector('svg'));}
+tabU.addEventListener('click',()=>tab(true));tabD.addEventListener('click',()=>tab(false));tab(true);
+
+// ================= generation example =================
+const STEPS=50,TAU=8;
+const ALL=IMGS.map((_,i)=>i);
+function post(x,ab,idx,out){const sa=Math.sqrt(ab),inv=1/(2*(1-ab)*TAU);const lg=new Float64Array(idx.length);let m=-Infinity;
+  idx.forEach((ii,j)=>{const im=IMGS[ii];let d=0;for(let i=0;i<DIM;i++){const v=x[i]-sa*im[i];d+=v*v;}lg[j]=-d*inv;if(lg[j]>m)m=lg[j];});
+  let s=0;for(let j=0;j<idx.length;j++){lg[j]=Math.exp(lg[j]-m);s+=lg[j];}out.fill(0);
+  idx.forEach((ii,j)=>{const w=lg[j]/s;if(w<1e-6)return;const im=IMGS[ii];for(let i=0;i<DIM;i++)out[i]+=w*im[i];});}
+function generate(ci,w,seed){const r=rng(seed);let x=new Float32Array(DIM);for(let i=0;i<DIM;i++)x[i]=gauss(r);
+  const idxC=ALL.filter(i=>CLS[i]===ci);const ts=[];for(let k=0;k<=STEPS;k++)ts.push(Math.round(T*(1-k/STEPS)));
+  const frames=[];const xu=new Float32Array(DIM),xc=new Float32Array(DIM);
+  for(let k=0;k<STEPS;k++){const t=ts[k],ab=AB[t],sa=Math.sqrt(ab),s1=Math.sqrt(1-ab);
+    post(x,ab,ALL,xu);post(x,ab,idxC,xc);
+    const x0=new Float32Array(DIM),e=new Float32Array(DIM);
+    for(let i=0;i<DIM;i++){let v=xu[i]+w*(xc[i]-xu[i]);v=v<-1?-1:v>1?1:v;x0[i]=v;e[i]=(x[i]-sa*v)/s1;}
+    frames.push({t,x:x.slice(),e,x0});
+    const abn=AB[ts[k+1]],san=Math.sqrt(abn),s1n=Math.sqrt(1-abn);const nx=new Float32Array(DIM);for(let i=0;i<DIM;i++)nx[i]=san*x0[i]+s1n*e[i];x=nx;}
+  const z=new Float32Array(DIM);frames.push({t:0,x,e:z,x0:x});return frames;}
+
+let gCls=0,gSeed=42,frames=null,gAnim=null;
+const pr=document.getElementById('prompts');const promptBtns=[];
+DRAW.forEach((_,i)=>{const b=document.createElement('button');b.setAttribute('aria-pressed',i===0);
+  b.addEventListener('click',()=>{gCls=i;promptBtns.forEach((x,j)=>x.setAttribute('aria-pressed',j===i));run(true);});pr.appendChild(b);promptBtns.push(b);});
+const gX=document.getElementById('gX'),gE=document.getElementById('gE'),g0=document.getElementById('g0'),gStep=document.getElementById('gStep'),gStepNum=document.getElementById('gStepNum'),gW=document.getElementById('gW'),gWNum=document.getElementById('gWNum');
+const strip=document.getElementById('strip');const STRIP_K=[0,10,20,30,40,50];const stripCv=[];
+STRIP_K.forEach(k=>{const f=document.createElement('figure');const c=document.createElement('canvas');c.width=c.height=W;
+  c.addEventListener('click',()=>{gAnim=null;showG(k);});const cap=document.createElement('figcaption');cap.textContent='t='+Math.round(T*(1-k/STEPS));f.appendChild(c);f.appendChild(cap);strip.appendChild(f);stripCv.push(c);});
+langHooks.push(()=>{const cl=S('classes');promptBtns.forEach((b,i)=>{b.textContent=(LANG==='zh'?'“':'“')+cl[i]+'”';});pr.setAttribute('aria-label',S('promptsAria'));
+  stripCv.forEach((c,i)=>{c.title=S('jump')+STRIP_K[i]+(LANG==='zh'?' 步':'');});});
+function showG(k){const f=frames[k];drawArr(gX,f.x);drawArr(gE,f.e,0.5);drawArr(g0,f.x0);gStep.value=k;gStepNum.textContent=k+'/'+STEPS+' · t='+f.t;}
+function run(animate){frames=generate(gCls,+gW.value,gSeed);STRIP_K.forEach((k,i)=>drawArr(stripCv[i],frames[k].x));
+  if(animate&&!reduceMotion){gAnim={k:0,last:0};showG(0);}else{gAnim=null;showG(STEPS);}}
+gStep.addEventListener('input',()=>{gAnim=null;showG(+gStep.value);});
+gW.addEventListener('input',()=>{gWNum.textContent=(+gW.value).toFixed(1);});
+gW.addEventListener('change',()=>run(true));
+document.getElementById('gSeed').addEventListener('click',()=>{gSeed=(Math.random()*1e9)|0;run(true);});
+document.getElementById('gPlay').addEventListener('click',()=>run(true));
+function gLoop(now){requestAnimationFrame(gLoop);if(gAnim&&now-gAnim.last>90){gAnim.last=now;showG(gAnim.k);gAnim.k++;if(gAnim.k>STEPS)gAnim=null;}}
+requestAnimationFrame(gLoop);
+
+applyLang();
+run(false);
+})();
+</script>
+</body>
+</html>
