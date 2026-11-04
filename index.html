@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,600;7..72,800&family=IBM+Plex+Sans:wght@400;500;700&family=Noto+Serif+SC:wght@600;900&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&family=STIX+Two+Text:ital@0;1&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" crossorigin="anonymous">
 <style>
 /* Layout: one reading column (~68ch) with full-bleed lab "stages" for interactive pieces; signal = teal, noise = orange throughout */
 :root{
@@ -66,10 +67,12 @@ button:focus-visible,input:focus-visible,.blk:focus-visible{outline:2px solid va
 .num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:.85rem;color:var(--muted);white-space:nowrap}
 .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:.88rem;color:var(--muted)}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
-.eq{font-family:var(--f-math);font-size:1.25rem;padding:14px 18px;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow-x:auto;white-space:nowrap;line-height:1.6}
-.eq i{font-style:italic}
-.eq .c-s{color:var(--signal)} .eq .c-n{color:var(--noise)}
-.eq sub,.eq sup{font-size:.7em}
+.eq{padding:6px 18px;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow-x:auto;overflow-y:hidden;font-size:1.05rem}
+.eq .katex-display{margin:.6em 0}
+.katex{font-size:1.06em}
+.c-s{color:var(--signal)} .c-n{color:var(--noise)}
+.num .katex{font-size:1em;color:var(--muted)}
+.chip .katex{font-size:1em}
 .mathgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:24px}
 .mathgrid>div{min-width:0}
 .mixer{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:end}
@@ -77,7 +80,7 @@ button:focus-visible,input:focus-visible,.blk:focus-visible{outline:2px solid va
 .mixer canvas{width:100%;aspect-ratio:1;border-radius:4px;border:1px solid var(--line);display:block;image-rendering:pixelated}
 figcaption{font-size:.8rem;color:var(--muted);text-align:center}
 .bars{display:flex;flex-direction:column;gap:8px}
-.bar{display:grid;grid-template-columns:8.5em 1fr 4.2em;gap:10px;align-items:center;font-size:.88rem}
+.bar{display:grid;grid-template-columns:minmax(7.5em,max-content) 1fr 4.2em;gap:10px;align-items:center;font-size:.88rem}
 .bar .track{height:10px;background:var(--line);border-radius:5px;overflow:hidden}
 .bar .fill{height:100%;border-radius:5px}
 #chart{width:100%;height:220px;display:block}
@@ -111,6 +114,7 @@ pre .cm{color:var(--muted)}
 .strip figure{margin:0;display:flex;flex-direction:column;gap:3px;min-width:0}
 .strip canvas{width:100%;aspect-ratio:1;border-radius:3px;display:block;cursor:pointer;border:1px solid var(--line)}
 .strip figcaption{font-family:var(--f-mono);font-size:.68rem}
+@media (max-width:520px){.eq{font-size:.88rem;padding-inline:10px}}
 @media (max-width:520px){.triple{gap:6px;padding:10px}.triple figcaption{font-size:.7rem}.strip{grid-template-columns:repeat(3,1fr)}}
 footer{font-size:.85rem;color:var(--muted);display:flex;flex-direction:column;gap:6px}
 @media (prefers-reduced-motion: reduce){*{scroll-behavior:auto!important}}
@@ -134,9 +138,9 @@ footer{font-size:.85rem;color:var(--muted);display:flex;flex-direction:column;ga
 <section aria-label="3D">
   <div class="stage">
     <div id="three" role="img"></div>
-    <div class="hud"><span class="chip" id="modeChip"></span><span class="chip" id="tChip">t = 0</span></div>
+    <div class="hud"><span class="chip" id="modeChip"></span><span class="chip" id="tChip"></span></div>
     <div class="controls">
-      <div class="grow"><label for="tSlider" class="num" data-i18n="timestep"></label><input id="tSlider" type="range" min="0" max="1000" value="0" step="1"><span class="num" id="abNum">ᾱ = 1.000</span></div>
+      <div class="grow"><label for="tSlider" class="num" data-i18n="timestep"></label><input id="tSlider" type="range" min="0" max="1000" value="0" step="1"><span class="num" id="abNum"></span></div>
       <button id="btnNoise" data-i18n="btnNoise"></button>
       <button id="btnGen" class="primary" data-i18n="btnGen"></button>
       <button id="btnArrows" aria-pressed="false" data-i18n="btnArrows"></button>
@@ -158,7 +162,7 @@ footer{font-size:.85rem;color:var(--muted);display:flex;flex-direction:column;ga
     <h3 data-i18n="m1h"></h3>
     <p data-i18n="m1p"></p>
   </div>
-  <div class="eq"><i>x</i><sub>t</sub> = <span class="c-s">√ᾱ<sub>t</sub></span> · <i>x</i><sub>0</sub> + <span class="c-n">√(1 − ᾱ<sub>t</sub>)</span> · <i>ε</i>,&nbsp;&nbsp; <i>ε</i> ~ 𝒩(0, <i>I</i>),&nbsp;&nbsp; ᾱ<sub>t</sub> = ∏<sub>s≤t</sub>(1 − β<sub>s</sub>)</div>
+  <div class="eq">\[ x_t \;=\; \htmlClass{c-s}{\sqrt{\bar\alpha_t}}\,x_0 \;+\; \htmlClass{c-n}{\sqrt{1-\bar\alpha_t}}\,\varepsilon,\qquad \varepsilon\sim\mathcal{N}(0,\mathbf{I}),\qquad \bar\alpha_t=\prod_{s=1}^{t}(1-\beta_s) \]</div>
 
   <div class="mathgrid">
     <div class="card">
@@ -171,11 +175,12 @@ footer{font-size:.85rem;color:var(--muted);display:flex;flex-direction:column;ga
         <div class="bar"><span data-i18n="coefS"></span><div class="track"><div class="fill" id="barS" style="background:var(--signal)"></div></div><span class="num" id="numS">1.000</span></div>
         <div class="bar"><span data-i18n="coefN"></span><div class="track"><div class="fill" id="barN" style="background:var(--noise)"></div></div><span class="num" id="numN">0.000</span></div>
       </div>
-      <div style="display:flex;gap:10px;align-items:center"><label for="mixT" class="num">t</label><input id="mixT" type="range" min="0" max="1000" value="250"><span class="num" id="mixTNum">250</span></div>
+      <div style="display:flex;gap:10px;align-items:center"><label for="mixT" class="num">\(t\)</label><input id="mixT" type="range" min="0" max="1000" value="250"><span class="num" id="mixTNum">250</span></div>
       <p class="num" id="sumNum"></p>
     </div>
     <div class="card">
       <canvas id="chart"></canvas>
+      <div class="legend"><span><span class="dot" style="background:var(--signal)"></span><span data-i18n="chartS"></span></span><span><span class="dot" style="background:var(--noise)"></span><span data-i18n="chartN"></span></span></div>
       <p class="note" data-i18n="chartNote"></p>
     </div>
   </div>
@@ -184,25 +189,28 @@ footer{font-size:.85rem;color:var(--muted);display:flex;flex-direction:column;ga
     <h3 data-i18n="m2h"></h3>
     <p data-i18n="m2p"></p>
   </div>
-  <div class="eq"><i>L</i>(θ) = 𝔼<sub><i>x</i><sub>0</sub>, <i>ε</i>, <i>t</i></sub> ‖ <i>ε</i> − <i>ε</i><sub>θ</sub>( <span class="c-s">√ᾱ<sub>t</sub></span><i>x</i><sub>0</sub> + <span class="c-n">√(1−ᾱ<sub>t</sub>)</span><i>ε</i>, <i>t</i>, <i>c</i> ) ‖²</div>
+  <div class="eq">\[ \mathcal{L}(\theta) \;=\; \mathbb{E}_{x_0,\,\varepsilon,\,t}\Big[\,\big\|\,\varepsilon-\varepsilon_\theta\big(\htmlClass{c-s}{\sqrt{\bar\alpha_t}}\,x_0+\htmlClass{c-n}{\sqrt{1-\bar\alpha_t}}\,\varepsilon,\;t,\;c\big)\big\|^2\,\Big] \]</div>
   <pre data-i18n="code"></pre>
 
   <div class="mathgrid">
     <div class="stack" style="min-width:0">
       <h3 data-i18n="m3h"></h3>
       <p data-i18n="m3p1"></p>
+      <div class="eq">\[ \begin{aligned} \log p_\theta(x_0)\;\ge\;&\;\mathbb{E}_q\!\big[\log p_\theta(x_0\mid x_1)\big]\\ &-\sum_{t=2}^{T}\mathbb{E}_q\Big[D_{\mathrm{KL}}\big(q(x_{t-1}\mid x_t,x_0)\,\big\|\,p_\theta(x_{t-1}\mid x_t)\big)\Big]\\ &-D_{\mathrm{KL}}\big(q(x_T\mid x_0)\,\big\|\,p(x_T)\big) \end{aligned} \]</div>
+      <p data-i18n="m3p1b"></p>
       <p data-i18n="m3p2"></p>
-      <div class="eq" style="font-size:1.05rem"><i>ε</i><sub>θ</sub><sup>*</sup>(<i>x</i><sub>t</sub>) = −√(1−ᾱ<sub>t</sub>) · ∇<sub><i>x</i></sub> log <i>p</i><sub>t</sub>(<i>x</i><sub>t</sub>)</div>
+      <div class="eq">\[ \varepsilon_\theta^*(x_t)\;=\;\mathbb{E}[\varepsilon\mid x_t]\;=\;-\sqrt{1-\bar\alpha_t}\;\nabla_{x}\log p_t(x_t) \]</div>
       <p data-i18n="m3p3"></p>
     </div>
     <div class="stack" style="min-width:0">
       <h3 data-i18n="m4h"></h3>
       <p data-i18n="m4p1"></p>
-      <div class="eq" style="font-size:1.05rem"><i>x</i><sub>t−1</sub> = <sup>1</sup>⁄<sub>√α<sub>t</sub></sub> ( <i>x</i><sub>t</sub> − <sup>β<sub>t</sub></sup>⁄<sub>√(1−ᾱ<sub>t</sub>)</sub> <i>ε</i><sub>θ</sub> ) + σ<sub>t</sub><i>z</i></div>
+      <div class="eq">\[ x_{t-1}\;=\;\frac{1}{\sqrt{\alpha_t}}\Big(x_t-\frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\,\varepsilon_\theta(x_t,t,c)\Big)+\sigma_t z,\qquad \alpha_t=1-\beta_t,\quad z\sim\mathcal{N}(0,\mathbf{I}) \]</div>
       <p data-i18n="m4p2"></p>
+      <div class="eq">\[ \hat{x}_0=\frac{x_t-\sqrt{1-\bar\alpha_t}\,\hat\varepsilon}{\sqrt{\bar\alpha_t}},\qquad x_{t'}=\sqrt{\bar\alpha_{t'}}\,\hat{x}_0+\sqrt{1-\bar\alpha_{t'}}\,\hat\varepsilon \]</div>
       <h3 data-i18n="m5h"></h3>
       <p data-i18n="m5p"></p>
-      <div class="eq" style="font-size:1.05rem"><i>ε̂</i> = <i>ε</i><sub>θ</sub>(<i>x</i><sub>t</sub>, ∅) + <i>w</i> · [ <i>ε</i><sub>θ</sub>(<i>x</i><sub>t</sub>, <i>c</i>) − <i>ε</i><sub>θ</sub>(<i>x</i><sub>t</sub>, ∅) ]</div>
+      <div class="eq">\[ \hat\varepsilon\;=\;\varepsilon_\theta(x_t,\varnothing)\;+\;w\,\big[\varepsilon_\theta(x_t,c)-\varepsilon_\theta(x_t,\varnothing)\big] \]</div>
     </div>
   </div>
   <p class="note col" data-i18n="mathNote"></p>
@@ -233,7 +241,7 @@ footer{font-size:.85rem;color:var(--muted);display:flex;flex-direction:column;ga
     <text class="lbl" x="430" y="52" data-i18n="svEvery"></text>
     <path class="ln txt" d="M360,336 V302"/><path class="ln txt" d="M330,340 C300,320 300,250 305,236"/><path class="ln txt" d="M390,340 C420,320 420,250 415,236"/>
     <text class="lbl" x="470" y="330" data-i18n="svCross"></text>
-    <g class="blk io" data-k="in"><rect x="10" y="35" width="90" height="120" rx="4"/><text x="55" y="88" data-i18n="svIn"></text><text class="s" x="55" y="104">xₜ 64×64×4</text></g>
+    <g class="blk io" data-k="in"><rect x="10" y="35" width="90" height="120" rx="4"/><text x="55" y="88" data-i18n="svIn"></text><text class="s" x="55" y="104">64×64×4</text></g>
     <g class="blk enc" data-k="e1"><rect x="110" y="35" width="70" height="120" rx="4"/><text x="145" y="88" data-i18n="svE1"></text><text class="s" x="145" y="104">64² · 320</text></g>
     <g class="blk enc" data-k="e2"><rect x="190" y="108" width="70" height="84" rx="4"/><text x="225" y="146" data-i18n="svE2"></text><text class="s" x="225" y="162">32² · 640</text></g>
     <g class="blk enc" data-k="e3"><rect x="270" y="178" width="70" height="56" rx="4"/><text x="305" y="203" data-i18n="svE3"></text><text class="s" x="305" y="219">16² · 1280</text></g>
@@ -241,7 +249,7 @@ footer{font-size:.85rem;color:var(--muted);display:flex;flex-direction:column;ga
     <g class="blk dec" data-k="d3"><rect x="380" y="178" width="70" height="56" rx="4"/><text x="415" y="203" data-i18n="svD3"></text><text class="s" x="415" y="219">16² · 1280</text></g>
     <g class="blk dec" data-k="d2"><rect x="460" y="108" width="70" height="84" rx="4"/><text x="495" y="146" data-i18n="svD2"></text><text class="s" x="495" y="162">32² · 640</text></g>
     <g class="blk dec" data-k="d1"><rect x="540" y="35" width="70" height="120" rx="4"/><text x="575" y="88" data-i18n="svD1"></text><text class="s" x="575" y="104">64² · 320</text></g>
-    <g class="blk io" data-k="out"><rect x="620" y="35" width="90" height="120" rx="4"/><text x="665" y="88" data-i18n="svOut"></text><text class="s" x="665" y="104">ε̂ 64×64×4</text></g>
+    <g class="blk io" data-k="out"><rect x="620" y="35" width="90" height="120" rx="4"/><text x="665" y="88" data-i18n="svOut"></text><text class="s" x="665" y="104">64×64×4</text></g>
     <g class="blk" data-k="time"><rect x="300" y="30" width="120" height="34" rx="4"/><text x="360" y="52" data-i18n="svTime"></text></g>
     <g class="blk" data-k="text"><rect x="290" y="336" width="140" height="40" rx="4"/><text x="360" y="354" data-i18n="svText"></text><text class="s" x="360" y="369">CLIP / T5 → 77×768</text></g>
   </svg>
@@ -252,12 +260,12 @@ footer{font-size:.85rem;color:var(--muted);display:flex;flex-direction:column;ga
     <path class="ln" d="M100,120 H118" marker-end="url(#ar2)"/><path class="ln" d="M210,120 H228" marker-end="url(#ar2)"/>
     <path class="ln" d="M340,120 H358" marker-end="url(#ar2)"/><path class="ln" d="M520,120 H538" marker-end="url(#ar2)"/><path class="ln" d="M610,120 H618" marker-end="url(#ar2)"/>
     <path class="ln txt" d="M440,236 V196"/>
-    <g class="blk io" data-k="in"><rect x="10" y="70" width="90" height="100" rx="4"/><text x="55" y="116" data-i18n="svIn"></text><text class="s" x="55" y="132">xₜ 64×64×4</text></g>
+    <g class="blk io" data-k="in"><rect x="10" y="70" width="90" height="100" rx="4"/><text x="55" y="116" data-i18n="svIn"></text><text class="s" x="55" y="132">64×64×4</text></g>
     <g class="blk enc" data-k="patch"><rect x="120" y="70" width="90" height="100" rx="4"/><text x="165" y="116" data-i18n="svPatch"></text><text class="s" x="165" y="132">2×2 → 1024</text></g>
     <g class="blk enc" data-k="tok"><rect x="230" y="70" width="110" height="100" rx="4"/><text x="285" y="108" data-i18n="svTok"></text><text class="s" x="285" y="124">1024 × 1152</text><text class="s" x="285" y="140" data-i18n="svPos"></text></g>
     <g class="blk dec" data-k="tf"><rect x="360" y="40" width="160" height="156" rx="4"/><text x="440" y="70" data-i18n="svTf"></text><text class="s" x="440" y="96" data-i18n="svSelf"></text><text class="s" x="440" y="114" data-i18n="svTxtAttn"></text><text class="s" x="440" y="132" data-i18n="svMlp"></text><text class="s" x="440" y="150" data-i18n="svAda"></text></g>
     <g class="blk enc" data-k="unpatch"><rect x="540" y="70" width="70" height="100" rx="4"/><text x="575" y="116" data-i18n="svUnp1"></text><text class="s" x="575" y="132" data-i18n="svUnp2"></text></g>
-    <g class="blk io" data-k="out"><rect x="620" y="70" width="90" height="100" rx="4"/><text x="665" y="116" data-i18n="svOut"></text><text class="s" x="665" y="132">ε̂ 64×64×4</text></g>
+    <g class="blk io" data-k="out"><rect x="620" y="70" width="90" height="100" rx="4"/><text x="665" y="116" data-i18n="svOut"></text><text class="s" x="665" y="132">64×64×4</text></g>
     <g class="blk" data-k="cond"><rect x="360" y="236" width="160" height="44" rx="4"/><text x="440" y="256" data-i18n="svCond"></text><text class="s" x="440" y="271">T5 / CLIP</text></g>
   </svg>
   </div>
@@ -277,7 +285,7 @@ footer{font-size:.85rem;color:var(--muted);display:flex;flex-direction:column;ga
     </div>
     <div class="strip" id="strip"></div>
     <div class="controls">
-      <div class="grow"><label for="gStep" class="num" data-i18n="steps"></label><input id="gStep" type="range" min="0" max="50" value="0"><span class="num" id="gStepNum">0/50 · t=1000</span></div>
+      <div class="grow"><label for="gStep" class="num" data-i18n="steps"></label><input id="gStep" type="range" min="0" max="50" value="0"><span class="num" id="gStepNum"></span></div>
       <div class="grow" style="flex-basis:200px"><label for="gW" class="num" data-i18n="guidance"></label><input id="gW" type="range" min="0" max="6" step="0.5" value="2"><span class="num" id="gWNum">2.0</span></div>
       <button id="gSeed" data-i18n="gSeed"></button>
       <button id="gPlay" class="primary" data-i18n="gPlay"></button>
@@ -293,12 +301,15 @@ footer{font-size:.85rem;color:var(--muted);display:flex;flex-direction:column;ga
 </footer>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 (function(){
 "use strict";
 // ================= i18n =================
+const R=String.raw;
 const STR={
 en:{
  eyebrow:'Diffusion Models · Interactive Guide',
@@ -307,40 +318,42 @@ en:{
  timestep:'Time step', btnNoise:'Play noising', btnGen:'Generate from noise', btnArrows:'Show denoising direction',
  modeFwd:'Forward: add noise', modeGen:'Reverse: generate', threeAria:'3D point cloud: data manifold and the diffusion process',
  lg1:'Close to real data', lg2:'Close to pure noise', lg3:'Where real data lives (the rolled-up sheet)',
- note3d:'This is a 3D toy. A 512×512 color image has about 786,000 numbers, so it is one point in a 786,000-dimensional space, but the idea is the same: real images occupy a very thin region and almost everywhere else is noise. After you press “Generate from noise”, scrub the time step to replay the process.',
+ note3d:R`This is a 3D toy. A \(512\times512\) color image has \(512\times512\times3\approx 786{,}000\) numbers, so it is one point in \(\mathbb{R}^{786{,}000}\), but the idea is the same: real images occupy a very thin region and almost everywhere else is noise. After you press “Generate from noise”, scrub the time step to replay the process.`,
  noWebGL:'The 3D view needs WebGL, which did not load in this browser. The rest of the page still works.',
  part1:'Part 1', mathH:'The math',
  m1h:'1. Adding noise: one formula reaches any step',
- m1p:'Think of each step as mixing a drink: one part image, one part noise. <span class="sig">√ᾱ<sub>t</sub></span> controls how much of the original image remains, and <span class="noi">√(1−ᾱ<sub>t</sub>)</span> controls how much noise there is. Their squares always add up to 1, so the overall “energy” of the image stays constant.',
- capX0:'Image x₀', capEps:'Noise ε', capXt:'Mix xₜ', coefS:'Image coefficient', coefN:'Noise coefficient',
- chartNote:'Linear noise schedule: β rises evenly from 0.0001 to 0.02 over 1000 steps. At step 1000 the image coefficient is only about 0.006.',
- chartS:'√ᾱ image', chartN:'√(1−ᾱ) noise', chartAria:'How the two coefficients change over time steps',
+ m1p:R`Think of each step as mixing a drink: one part image, one part noise. <span class="sig">\(\sqrt{\bar\alpha_t}\)</span> controls how much of the original image remains, and <span class="noi">\(\sqrt{1-\bar\alpha_t}\)</span> controls how much noise there is. Since \(\big(\sqrt{\bar\alpha_t}\big)^2+\big(\sqrt{1-\bar\alpha_t}\big)^2=1\), the overall “energy” of the image stays constant.`,
+ capX0:R`Image \(x_0\)`, capEps:R`Noise \(\varepsilon\)`, capXt:R`Mix \(x_t\)`,
+ coefS:R`Image \(\sqrt{\bar\alpha_t}\)`, coefN:R`Noise \(\sqrt{1-\bar\alpha_t}\)`,
+ chartNote:R`Linear noise schedule: \(\beta_t\) rises evenly from \(10^{-4}\) to \(0.02\) over \(T=1000\) steps. At \(t=1000\), \(\sqrt{\bar\alpha_t}\approx 0.006\).`,
+ chartS:R`\(\sqrt{\bar\alpha_t}\): image`, chartN:R`\(\sqrt{1-\bar\alpha_t}\): noise`, chartAria:'How the two coefficients change over time steps',
  m2h:'2. The training objective: guess the noise that was added',
- m2p:'The network ε<sub>θ</sub> looks at the noisy image x<sub>t</sub>, the time step t and the text c, and outputs the noise it thinks was added. The loss is the squared difference between that prediction and the true noise.',
+ m2p:R`The network \(\varepsilon_\theta\) looks at the noisy image \(x_t\), the time step \(t\) and the text \(c\), and outputs the noise it thinks was added. The loss is the squared difference between that prediction and the true noise \(\varepsilon\).`,
  code:'<span class="cm"># one training iteration</span>\nx0   = sample_images()  <span class="cm"># encoded to latent space, e.g. 64×64×4</span>\nc    = text_encoder(captions)  <span class="cm"># replaced by empty text 10% of the time, for guidance</span>\nt    = randint(1, 1000)\neps  = randn_like(x0)\nxt   = sqrt(abar[t]) * x0 + sqrt(1 - abar[t]) * eps\nloss = mse(model(xt, t, c), eps)\nloss.backward(); optimizer.step()  <span class="cm"># repeat hundreds of thousands to millions of times</span>',
  m3h:'3. Why this objective is correct',
- m3p1:'<b>It comes from maximum likelihood.</b> We want the probability p<sub>θ</sub>(x<sub>0</sub>) of generating real images to be as high as possible. It cannot be computed directly, so we derive a lower bound, the ELBO. Plugging in the diffusion process splits the bound into one KL-divergence term per step, and the KL between two Gaussians simplifies to exactly “predicted noise − true noise” squared, times a weight. The DDPM paper found that dropping the weight works better, which gives the loss above.',
- m3p2:'<b>It also follows from Tweedie’s formula.</b> The minimizer of a squared error is the conditional expectation. For data corrupted by Gaussian noise:',
- m3p3:'The gradient on the right is called the “score”. It points toward higher probability, which means “toward real images”. Minimizing the loss teaches the network this direction. The “denoising direction” arrows in the 3D demo draw exactly this.',
- m4h:'4. Generation: walking back from t = 1000',
- m4p1:'Start from pure noise x<sub>T</sub>. Each step removes part of the predicted noise and adds back a little fresh randomness (DDPM):',
- m4p2:'The demos on this page use DDIM instead: estimate the original image x̂<sub>0</sub>, then remix it to the next noise level with formula 1. DDIM can skip steps, so 50 steps are enough.',
+ m3p1:R`<b>It comes from maximum likelihood.</b> We want the probability \(p_\theta(x_0)\) of generating real images to be as high as possible. It cannot be computed directly, so we derive a lower bound, the ELBO:`,
+ m3p1b:R`Each KL term compares two Gaussians and simplifies to \(\lambda_t\,\big\|\varepsilon-\varepsilon_\theta(x_t,t)\big\|^2\) for a weight \(\lambda_t\). The DDPM paper found that setting \(\lambda_t=1\) works better, which gives the loss above.`,
+ m3p2:R`<b>It also follows from Tweedie’s formula.</b> The minimizer of a squared error is the conditional expectation, \(\varepsilon_\theta^*(x_t)=\mathbb{E}[\varepsilon\mid x_t]\). For data corrupted by Gaussian noise this equals:`,
+ m3p3:R`The gradient \(\nabla_x\log p_t(x_t)\) is called the “score”. It points toward higher probability, which means “toward real images”. Minimizing the loss teaches the network this direction. The “denoising direction” arrows in the 3D demo draw exactly this.`,
+ m4h:R`4. Generation: walking back from \(t=1000\)`,
+ m4p1:R`Start from pure noise \(x_T\sim\mathcal{N}(0,\mathbf{I})\). Each step removes part of the predicted noise and adds back a little fresh randomness (DDPM):`,
+ m4p2:R`The demos on this page use DDIM instead: estimate the clean image \(\hat{x}_0\), then remix it to the next noise level \(t'\lt t\) with formula 1. DDIM can skip steps, so 50 steps are enough:`,
  m5h:'5. Text guidance (classifier-free guidance)',
- m5p:'Run the network twice per step, once with the text and once without. Amplifying the difference by a factor w makes the image follow the description more closely; too large a w oversaturates the colors.',
+ m5p:R`Run the network twice per step, once with the text \(c\) and once with empty text \(\varnothing\). Amplifying the difference by a factor \(w\) makes the image follow the description more closely; too large a \(w\) oversaturates the colors.`,
  mathNote:'The math guarantees the objective is right: at the minimum of the loss, the learned direction is correct. Whether gradient descent actually finds parameters that good has no rigorous proof. That part is established by experiment.',
  part2:'Part 2', archH:'What the network looks like inside',
- archP:'Both architectures have the same inputs and outputs: a noisy image (64×64×4 in latent space), the time step and the text go in, and a noise prediction of the same size comes out. Click any block in the diagram for an explanation.',
+ archP:R`Both architectures have the same inputs and outputs: a noisy latent \(x_t\in\mathbb{R}^{64\times64\times4}\), the time step \(t\) and the text \(c\) go in, and a noise prediction \(\hat\varepsilon\) of the same shape comes out. Click any block in the diagram for an explanation.`,
  tabU:'U-Net (Stable Diffusion 1.x / 2.x / XL)', tabD:'DiT (SD3, Sora and similar)',
  svSkip:'Skip connections carry detail straight across', svEvery:'→ added to every block', svCross:'cross-attention',
  svIn:'Noisy input', svE1:'Encoder 1', svE2:'Encoder 2', svE3:'Encoder 3', svMid:'Bottleneck', svD3:'Decoder 3', svD2:'Decoder 2', svD1:'Decoder 1', svOut:'Predicted noise',
- svTime:'Time step t → vector', svText:'Text encoder', svPatch:'Patchify', svTok:'Token sequence', svPos:'+ position', svTf:'Transformer block ×28',
- svSelf:'self-attention', svTxtAttn:'text attention', svMlp:'MLP', svAda:'adaLN: t, text modulation', svUnp1:'Unpatchify', svUnp2:'to full size', svCond:'Time step t + text',
+ svTime:'Time-step embedding', svText:'Text encoder', svPatch:'Patchify', svTok:'Token sequence', svPos:'+ position', svTf:'Transformer block ×28',
+ svSelf:'self-attention', svTxtAttn:'text attention', svMlp:'MLP', svAda:'adaLN modulation', svUnp1:'Unpatchify', svUnp2:'to full size', svCond:'Time step + text',
  part3:'Part 3', exH:'Example: how an image emerges',
- exP:'Pick a description and press “Generate”. The middle panel is what the network actually outputs at every step: its guess of the noise. On the left, the current image after removing noise; on the right, its current guess of the clean image. Early on it can only guess a blurry color layout. It becomes more certain as the steps go on.',
- capGX:'Current image xₜ', capGE:'Network output: predicted noise ε̂', capG0:'Guessed clean image x̂₀',
- steps:'Step', guidance:'Guidance w', gSeed:'New random start', gPlay:'Generate', jump:'Jump to step ',
- exNote1:'Try pulling w down to 0: the model ignores the text and may draw any category. Push it to 6: colors oversaturate, which is exactly what strong guidance looks like in real models. A new random start gives a different image for the same prompt.',
- exNote2:'Note: the “network” here is an ideal denoiser that computes the optimal answer directly against a dataset of 40 tiny images, so its results always land near images from that dataset. A real model has no dataset to look things up in. It has to learn this answer with hundreds of millions of parameters, and it can combine what it learned into images it has never seen.',
+ exP:R`Pick a description and press “Generate”. The middle panel is what the network actually outputs at every step: its guess of the noise \(\hat\varepsilon\). On the left is the current image \(x_t\); on the right, its current guess of the clean image \(\hat{x}_0\). Early on it can only guess a blurry color layout. It becomes more certain as the steps go on.`,
+ capGX:R`Current image \(x_t\)`, capGE:R`Network output: predicted noise \(\hat\varepsilon\)`, capG0:R`Guessed clean image \(\hat{x}_0\)`,
+ steps:'Step', guidance:R`Guidance \(w\)`, gSeed:'New random start', gPlay:'Generate', jump:'Jump to step ',
+ exNote1:R`Try pulling \(w\) down to \(0\): the model ignores the text and may draw any category. Push it to \(w=6\): colors oversaturate, which is exactly what strong guidance looks like in real models. A new random start gives a different image for the same prompt.`,
+ exNote2:R`Note: the “network” here is an ideal denoiser that computes the optimal answer \(\mathbb{E}[x_0\mid x_t]\) directly against a dataset of 40 tiny images, so its results always land near images from that dataset. A real model has no dataset to look things up in. It has to learn this answer with hundreds of millions of parameters, and it can combine what it learned into images it has never seen.`,
  refs:'References: Ho et al. 2020 (DDPM) · Song et al. 2021 (DDIM, score matching) · Rombach et al. 2022 (latent diffusion) · Peebles & Xie 2023 (DiT) · Ho & Salimans 2022 (classifier-free guidance)',
  src:'Source on GitHub',
  promptsAria:'Text prompt',
@@ -353,40 +366,42 @@ zh:{
  timestep:'时间步', btnNoise:'播放加噪', btnGen:'从噪声生成', btnArrows:'显示去噪方向',
  modeFwd:'正向：加噪', modeGen:'反向：生成', threeAria:'三维点云：数据流形与扩散过程',
  lg1:'接近真实数据', lg2:'接近纯噪声', lg3:'真实数据的位置（卷起来的纸）',
- note3d:'这是一个三维玩具。一张 512×512 的彩色图有 78 万个数字，是 78 万维空间里的一个点，但道理完全一样：真实图片只占很薄的一片，其他地方几乎全是噪声。“从噪声生成”后，可以拖动时间步来回看生成过程。',
+ note3d:R`这是一个三维玩具。一张 \(512\times512\) 的彩色图有 \(512\times512\times3\approx 78\) 万个数字，是 \(\mathbb{R}^{786{,}000}\) 里的一个点，但道理完全一样：真实图片只占很薄的一片，其他地方几乎全是噪声。“从噪声生成”后，可以拖动时间步来回看生成过程。`,
  noWebGL:'三维视图需要 WebGL，当前浏览器没有加载成功。下面的内容不受影响。',
  part1:'第一部分', mathH:'数学原理',
  m1h:'1. 加噪：一个公式就能算出任意一步',
- m1p:'每一步都像调饮料：原图占一份，噪声占一份。<span class="sig">√ᾱ<sub>t</sub></span> 管原图占多少，<span class="noi">√(1−ᾱ<sub>t</sub>)</span> 管噪声占多少。两者平方加起来等于 1，所以图的整体“能量”不变。',
- capX0:'原图 x₀', capEps:'噪声 ε', capXt:'混合 xₜ', coefS:'原图系数', coefN:'噪声系数',
- chartNote:'线性噪声表：β 从 0.0001 均匀增加到 0.02，共 1000 步。第 1000 步时原图系数只剩约 0.006。',
- chartS:'√ᾱ 原图', chartN:'√(1−ᾱ) 噪声', chartAria:'两个系数随时间步变化的曲线',
+ m1p:R`每一步都像调饮料：原图占一份，噪声占一份。<span class="sig">\(\sqrt{\bar\alpha_t}\)</span> 管原图占多少，<span class="noi">\(\sqrt{1-\bar\alpha_t}\)</span> 管噪声占多少。因为 \(\big(\sqrt{\bar\alpha_t}\big)^2+\big(\sqrt{1-\bar\alpha_t}\big)^2=1\)，图的整体“能量”保持不变。`,
+ capX0:R`原图 \(x_0\)`, capEps:R`噪声 \(\varepsilon\)`, capXt:R`混合 \(x_t\)`,
+ coefS:R`原图 \(\sqrt{\bar\alpha_t}\)`, coefN:R`噪声 \(\sqrt{1-\bar\alpha_t}\)`,
+ chartNote:R`线性噪声表：\(\beta_t\) 从 \(10^{-4}\) 均匀增加到 \(0.02\)，共 \(T=1000\) 步。到 \(t=1000\) 时，\(\sqrt{\bar\alpha_t}\approx 0.006\)。`,
+ chartS:R`\(\sqrt{\bar\alpha_t}\)：原图`, chartN:R`\(\sqrt{1-\bar\alpha_t}\)：噪声`, chartAria:'两个系数随时间步变化的曲线',
  m2h:'2. 训练目标：猜出加进去的噪声',
- m2p:'网络 ε<sub>θ</sub> 看着带噪图 x<sub>t</sub>、时间步 t 和文字 c，输出它认为加进去的噪声。损失就是预测和真实噪声的平方差。',
+ m2p:R`网络 \(\varepsilon_\theta\) 看着带噪图 \(x_t\)、时间步 \(t\) 和文字 \(c\)，输出它认为加进去的噪声。损失就是预测和真实噪声 \(\varepsilon\) 的平方差。`,
  code:'<span class="cm"># 一次训练迭代</span>\nx0   = 取一批图片(压到潜空间)        <span class="cm"># 例如 64×64×4</span>\nc    = 文本编码器(配套文字)          <span class="cm"># 10% 概率换成空文字，为引导做准备</span>\nt    = 随机整数(1, 1000)\neps  = 标准正态随机数(形状同 x0)\nxt   = sqrt(abar[t]) * x0 + sqrt(1 - abar[t]) * eps\nloss = 均方误差(网络(xt, t, c), eps)\nloss.反向传播();  优化器.走一小步()     <span class="cm"># 重复几十万到上百万次</span>',
  m3h:'3. 为什么这个目标是对的',
- m3p1:'<b>来自最大似然。</b>我们想让模型生成真实图片的概率 p<sub>θ</sub>(x<sub>0</sub>) 尽量大。它没法直接算，于是推一个下界 ELBO。把扩散过程代进去，下界拆成每一步一项 KL 散度；两个高斯分布之间的 KL 化简后，正好是“预测噪声 − 真实噪声”的平方，前面带个权重。DDPM 论文发现去掉权重效果更好，就成了上面的损失。',
- m3p2:'<b>来自 Tweedie 公式。</b>平方误差的最优解是条件期望。对带高斯噪声的数据有：',
- m3p3:'右边的梯度叫“分数”，指向概率最高的方向，也就是“往真图那边走”。损失降到最低，网络就学会了这个方向。三维演示里的“去噪方向”箭头画的就是它。',
- m4h:'4. 生成：从 t = 1000 往回走',
- m4p1:'从纯噪声 x<sub>T</sub> 出发，每一步减掉一部分预测噪声，再补一点新的随机性（DDPM）：',
- m4p2:'这页的演示用的是 DDIM：先估出原图 x̂<sub>0</sub>，再按公式 1 混回下一步的噪声水平，可以跳步，50 步就够。',
+ m3p1:R`<b>来自最大似然。</b>我们想让模型生成真实图片的概率 \(p_\theta(x_0)\) 尽量大。它没法直接算，于是推一个下界 ELBO：`,
+ m3p1b:R`每一项 KL 都是两个高斯分布之间的距离，化简后正好是 \(\lambda_t\,\big\|\varepsilon-\varepsilon_\theta(x_t,t)\big\|^2\)，前面带个权重 \(\lambda_t\)。DDPM 论文发现取 \(\lambda_t=1\) 效果更好，就成了上面的损失。`,
+ m3p2:R`<b>来自 Tweedie 公式。</b>平方误差的最优解是条件期望 \(\varepsilon_\theta^*(x_t)=\mathbb{E}[\varepsilon\mid x_t]\)。对带高斯噪声的数据，它等于：`,
+ m3p3:R`梯度 \(\nabla_x\log p_t(x_t)\) 叫“分数”，指向概率更高的方向，也就是“往真图那边走”。损失降到最低，网络就学会了这个方向。三维演示里的“去噪方向”箭头画的就是它。`,
+ m4h:R`4. 生成：从 \(t=1000\) 往回走`,
+ m4p1:R`从纯噪声 \(x_T\sim\mathcal{N}(0,\mathbf{I})\) 出发，每一步减掉一部分预测噪声，再补一点新的随机性（DDPM）：`,
+ m4p2:R`这页的演示用的是 DDIM：先估出原图 \(\hat{x}_0\)，再按公式 1 混回下一个噪声水平 \(t'\lt t\)。DDIM 可以跳步，50 步就够：`,
  m5h:'5. 文字引导（无分类器引导）',
- m5p:'同一步算两次：一次带文字，一次不带。把两者的差放大 w 倍，图会更贴近描述；w 太大颜色会过饱和。',
+ m5p:R`同一步算两次：一次带文字 \(c\)，一次用空文字 \(\varnothing\)。把两者的差放大 \(w\) 倍，图会更贴近描述；\(w\) 太大颜色会过饱和。`,
  mathNote:'数学保证的是“目标对”：只要损失最小，学到的方向就正确。至于梯度下降能不能真的找到那么好的参数，没有严格证明，靠的是大量实验。',
  part2:'第二部分', archH:'网络内部长什么样',
- archP:'两种结构的输入输出完全相同：输入带噪图（潜空间里 64×64×4）、时间步和文字，输出一张同样大小的噪声预测。点击图里的模块看说明。',
+ archP:R`两种结构的输入输出完全相同：输入带噪潜变量 \(x_t\in\mathbb{R}^{64\times64\times4}\)、时间步 \(t\) 和文字 \(c\)，输出一个同样形状的噪声预测 \(\hat\varepsilon\)。点击图里的模块看说明。`,
  tabU:'U-Net（Stable Diffusion 1.x / 2.x / XL）', tabD:'DiT（SD3、Sora 一类）',
  svSkip:'跳跃连接：把细节直接送到右边', svEvery:'→ 加到每个模块', svCross:'交叉注意力',
  svIn:'带噪输入', svE1:'编码 1', svE2:'编码 2', svE3:'编码 3', svMid:'瓶颈', svD3:'解码 3', svD2:'解码 2', svD1:'解码 1', svOut:'预测噪声',
- svTime:'时间步 t → 向量', svText:'文字编码器', svPatch:'切成小块', svTok:'词元序列', svPos:'+ 位置编码', svTf:'Transformer 块 ×28',
- svSelf:'自注意力', svTxtAttn:'文字注意力', svMlp:'前馈 MLP', svAda:'adaLN：t、文字调制', svUnp1:'拼回', svUnp2:'原尺寸', svCond:'时间步 t + 文字',
+ svTime:'时间步嵌入', svText:'文字编码器', svPatch:'切成小块', svTok:'词元序列', svPos:'+ 位置编码', svTf:'Transformer 块 ×28',
+ svSelf:'自注意力', svTxtAttn:'文字注意力', svMlp:'前馈 MLP', svAda:'adaLN 调制', svUnp1:'拼回', svUnp2:'原尺寸', svCond:'时间步 + 文字',
  part3:'第三部分', exH:'例子：一张图是怎么“浮现”的',
- exP:'选一句描述，按“生成”。中间那格就是网络每一步真正输出的东西：它猜的噪声。左边减掉噪声，右边是它此刻猜测的原图。前几步它只能猜出模糊的颜色分布，越往后越确定。',
- capGX:'当前图 xₜ', capGE:'网络输出：预测噪声 ε̂', capG0:'猜测的原图 x̂₀',
- steps:'步数', guidance:'引导 w', gSeed:'换个随机起点', gPlay:'生成', jump:'跳到第 ',
- exNote1:'试试把 w 拉到 0：模型不看文字，可能画出任何一类。拉到 6：颜色变得过饱和，这正是真实模型里引导太强的样子。换随机起点，同一句话会得到不同的图。',
- exNote2:'说明：这里的“网络”是理想去噪器，它直接对照一个 40 张小图的数据集算出最优答案，所以结果只会落在数据集的图附近。真实模型没有数据集可查，要靠几亿参数把这个答案学出来，而且能组合出从没见过的新图。',
+ exP:R`选一句描述，按“生成”。中间那格就是网络每一步真正输出的东西：它猜的噪声 \(\hat\varepsilon\)。左边是当前图 \(x_t\)，右边是它此刻猜测的原图 \(\hat{x}_0\)。前几步它只能猜出模糊的颜色分布，越往后越确定。`,
+ capGX:R`当前图 \(x_t\)`, capGE:R`网络输出：预测噪声 \(\hat\varepsilon\)`, capG0:R`猜测的原图 \(\hat{x}_0\)`,
+ steps:'步数', guidance:R`引导 \(w\)`, gSeed:'换个随机起点', gPlay:'生成', jump:'跳到第 ',
+ exNote1:R`试试把 \(w\) 拉到 \(0\)：模型不看文字，可能画出任何一类。拉到 \(w=6\)：颜色变得过饱和，这正是真实模型里引导太强的样子。换随机起点，同一句话会得到不同的图。`,
+ exNote2:R`说明：这里的“网络”是理想去噪器，它直接对照一个 40 张小图的数据集算出最优答案 \(\mathbb{E}[x_0\mid x_t]\)，所以结果只会落在数据集的图附近。真实模型没有数据集可查，要靠几亿参数把这个答案学出来，而且能组合出从没见过的新图。`,
  refs:'参考：Ho et al. 2020（DDPM）· Song et al. 2021（DDIM、分数匹配）· Rombach et al. 2022（潜空间扩散）· Peebles & Xie 2023（DiT）· Ho & Salimans 2022（无分类器引导）',
  src:'GitHub 源代码',
  promptsAria:'文字描述',
@@ -394,40 +409,44 @@ zh:{
 }};
 const INFO={
 en:{
- in:['Noisy input','A 512×512 image is first compressed by a VAE encoder into a 64×64×4 latent, then noised with the formula. The network works entirely in this small space; at the end a VAE decoder enlarges the result back into a picture.'],
- e1:['Encoder 1 (high resolution)','A few residual convolution blocks that look at local edges and textures. Each block also has self-attention and cross-attention. At the end it downsamples: size halves, channels double.'],
- e2:['Encoder 2','Lower resolution, so each position covers a larger area. It starts to see structure like “this region is sky, that region is ground”.'],
- e3:['Encoder 3','Compressed further; the features become more abstract, close to the level of “there is a cat here”.'],
- mid:['Bottleneck','The lowest resolution (8×8). Its view covers the whole image and decides the overall composition. Attention is cheapest here, and matters most.'],
- d3:['Decoder 3','Upsampling enlarges the feature map while concatenating the features passed across from the same level on the left.'],
- d2:['Decoder 2','Keeps enlarging. Thanks to skip connections, detail lost during compression is recovered here.'],
- d1:['Decoder 1','Back to 64×64. A final convolution turns the channels back into 4, producing the noise prediction.'],
- out:['Predicted noise ε̂','Exactly the same size as the input. During training it is compared with the true noise using mean squared error; during generation it is used to denoise.'],
- time:['Time-step embedding','The integer t is turned into a sinusoidal code, passed through a small MLP into a vector, and added inside every residual block. This tells the network how noisy the input is, so it knows whether to draw the broad layout or refine detail.'],
- text:['Text encoder + cross-attention','The text is first encoded by CLIP or T5 into a sequence of vectors. In cross-attention, every image position produces a query Q and the text vectors produce keys K and values V, so each position can “look at” the words relevant to it.'],
- patch:['Patchify','The 64×64 latent is cut into 2×2 patches, 32×32 = 1024 of them. Each patch is flattened and linearly projected into a vector that acts like a “word”.'],
- tok:['Token sequence','1024 tokens, each a 1152-dimensional vector (DiT-XL), plus a positional encoding that records where each patch came from.'],
- tf:['Transformer block','The same structure as a language model. Self-attention lets every patch see every other patch; text enters through attention (SD3 places image and text tokens together in joint attention); adaLN uses the time step and text to compute scale and shift factors that modulate every layer. Larger models work better, and it scales more easily than a U-Net.'],
- unpatch:['Unpatchify','Each token is projected back to 2×2×4 values, and the patches are reassembled by position into 64×64×4.'],
- cond:['Conditioning','A global vector from the time step and text drives the adaLN modulation; the per-word text vectors are used in attention.']},
+ in:['Noisy input',R`A \(512\times512\) image is first compressed by a VAE encoder into a latent \(x_0\in\mathbb{R}^{64\times64\times4}\), then noised into \(x_t\) with formula 1. The network works entirely in this small space; at the end a VAE decoder enlarges the result back into a picture.`],
+ e1:['Encoder 1 (high resolution)',R`A few residual convolution blocks at \(64\times64\) with \(320\) channels, looking at local edges and textures. Each block also has self-attention and cross-attention. At the end it downsamples: size halves, channels double.`],
+ e2:['Encoder 2',R`\(32\times32\) with \(640\) channels. Each position covers a larger area, so it starts to see structure like “this region is sky, that region is ground”.`],
+ e3:['Encoder 3',R`\(16\times16\) with \(1280\) channels. The features become more abstract, close to the level of “there is a cat here”.`],
+ mid:['Bottleneck',R`The lowest resolution, \(8\times8\). Its view covers the whole image and decides the overall composition. Attention costs \(O(n^2)\) in the number of positions \(n\), so it is cheapest here, and it matters most.`],
+ d3:['Decoder 3',R`Upsampling back to \(16\times16\) while concatenating the features passed across from the same level on the left.`],
+ d2:['Decoder 2',R`Keeps enlarging to \(32\times32\). Thanks to skip connections, detail lost during compression is recovered here.`],
+ d1:['Decoder 1',R`Back to \(64\times64\). A final convolution maps \(320\) channels to \(4\), producing the noise prediction.`],
+ out:[R`Predicted noise`,R`\(\hat\varepsilon=\varepsilon_\theta(x_t,t,c)\in\mathbb{R}^{64\times64\times4}\), exactly the shape of the input. During training it is compared with the true noise using \(\|\varepsilon-\hat\varepsilon\|^2\); during generation it is used to denoise.`],
+ time:['Time-step embedding',R`The integer \(t\) is turned into a sinusoidal code, \(\big[\sin(t\,\omega_k),\cos(t\,\omega_k)\big]_k\) with \(\omega_k=10000^{-k/d}\), passed through a small MLP into a vector, and added inside every residual block. This tells the network how noisy the input is, so it knows whether to draw the broad layout or refine detail.`],
+ text:['Text encoder + cross-attention',R`The text is encoded by CLIP or T5 into a sequence of vectors, e.g. \(77\times768\). In cross-attention, image positions produce queries \(Q\) and text vectors produce keys \(K\) and values \(V\): \(\mathrm{Attn}(Q,K,V)=\mathrm{softmax}\!\big(QK^\top/\sqrt{d}\big)V\). So each position can “look at” the words relevant to it.`],
+ patch:['Patchify',R`The \(64\times64\) latent is cut into \(2\times2\) patches, \(32\times32=1024\) of them. Each patch is flattened and linearly projected into a vector that acts like a “word”.`],
+ tok:['Token sequence',R`\(1024\) tokens, each a vector in \(\mathbb{R}^{1152}\) (DiT-XL), plus a positional encoding that records where each patch came from.`],
+ tf:['Transformer block',R`The same structure as a language model. Self-attention lets every patch see every other patch; text enters through attention (SD3 places image and text tokens together in joint attention); adaLN computes a scale \(\gamma\) and shift \(\beta\) from the time step and text, and modulates every layer as \(\gamma\odot\mathrm{LN}(h)+\beta\). Larger models work better, and it scales more easily than a U-Net.`],
+ unpatch:['Unpatchify',R`Each token is projected back to \(2\times2\times4\) values, and the patches are reassembled by position into \(64\times64\times4\).`],
+ cond:['Conditioning',R`A global vector from \(t\) and the text drives the adaLN modulation; the per-word text vectors are used in attention.`]},
 zh:{
- in:['带噪输入','一张 512×512 的图先被 VAE 编码器压成 64×64×4 的潜变量，再按公式加噪。网络全程在这个小空间里工作，最后再用 VAE 解码器放大回图片。'],
- e1:['编码 1（高分辨率）','几个残差卷积块，看局部的边缘和纹理。每个块里还有自注意力和交叉注意力。结束时下采样，尺寸减半，通道翻倍。'],
- e2:['编码 2','分辨率更低，每个位置覆盖的范围更大，开始看到“这一块是天空、那一块是地面”这样的结构。'],
- e3:['编码 3','进一步压缩，特征更抽象，接近“这里有一只猫”的语义层面。'],
- mid:['瓶颈','分辨率最低（8×8），视野覆盖全图，决定整体构图。这里的注意力最便宜，也最重要。'],
- d3:['解码 3','上采样把尺寸放大，同时把左边同一层传来的特征拼接进来。'],
- d2:['解码 2','继续放大。因为有跳跃连接，压缩时丢掉的细节在这里被找回。'],
- d1:['解码 1','回到 64×64，再用一层卷积把通道数变回 4，得到噪声预测。'],
- out:['预测噪声 ε̂','和输入大小完全一样。训练时拿它和真实噪声算均方误差；生成时用它去噪。'],
- time:['时间步嵌入','把整数 t 变成正弦编码，再经过一个小 MLP 变成向量，加到每个残差块里。网络靠它知道“现在噪声有多大”，从而决定是该画大轮廓还是修细节。'],
- text:['文字编码器 + 交叉注意力','文字先被 CLIP 或 T5 编码成一串向量。交叉注意力里，图上每个位置生成查询 Q，文字向量生成键 K 和值 V，于是每个位置都能去“看”和自己有关的词。'],
- patch:['切成小块','把 64×64 的潜变量切成 2×2 的小方块，共 32×32 = 1024 块，每块拉平后线性映射成一个向量，相当于一个“词”。'],
- tok:['词元序列','1024 个词元，每个是 1152 维向量（DiT-XL），再加上位置编码，告诉模型每块原来在哪。'],
- tf:['Transformer 块','和语言模型同一种结构：自注意力让所有小块互相看；文字通过注意力接入（SD3 把图和文字的词元放在一起做联合注意力）；adaLN 用时间步和文字算出缩放和平移系数，调制每一层。模型越大效果越好，扩展性比 U-Net 更强。'],
- unpatch:['拼回原尺寸','每个词元映射回 2×2×4 的数值，再按位置拼回 64×64×4。'],
- cond:['条件信息','时间步和文字的全局向量用于 adaLN 调制；文字的逐词向量用于注意力。']}};
-
+ in:['带噪输入',R`一张 \(512\times512\) 的图先被 VAE 编码器压成潜变量 \(x_0\in\mathbb{R}^{64\times64\times4}\)，再按公式 1 加噪得到 \(x_t\)。网络全程在这个小空间里工作，最后再用 VAE 解码器放大回图片。`],
+ e1:['编码 1（高分辨率）',R`几个残差卷积块，尺寸 \(64\times64\)，\(320\) 个通道，看局部的边缘和纹理。每个块里还有自注意力和交叉注意力。结束时下采样，尺寸减半，通道翻倍。`],
+ e2:['编码 2',R`\(32\times32\)，\(640\) 个通道。每个位置覆盖的范围更大，开始看到“这一块是天空、那一块是地面”这样的结构。`],
+ e3:['编码 3',R`\(16\times16\)，\(1280\) 个通道。特征更抽象，接近“这里有一只猫”的语义层面。`],
+ mid:['瓶颈',R`分辨率最低，\(8\times8\)，视野覆盖全图，决定整体构图。注意力的计算量是位置数 \(n\) 的 \(O(n^2)\)，所以这里最便宜，也最重要。`],
+ d3:['解码 3',R`上采样回 \(16\times16\)，同时把左边同一层传来的特征拼接进来。`],
+ d2:['解码 2',R`继续放大到 \(32\times32\)。因为有跳跃连接，压缩时丢掉的细节在这里被找回。`],
+ d1:['解码 1',R`回到 \(64\times64\)，再用一层卷积把 \(320\) 个通道变回 \(4\) 个，得到噪声预测。`],
+ out:['预测噪声',R`\(\hat\varepsilon=\varepsilon_\theta(x_t,t,c)\in\mathbb{R}^{64\times64\times4}\)，和输入形状完全一样。训练时用 \(\|\varepsilon-\hat\varepsilon\|^2\) 和真实噪声比较；生成时用它去噪。`],
+ time:['时间步嵌入',R`把整数 \(t\) 变成正弦编码 \(\big[\sin(t\,\omega_k),\cos(t\,\omega_k)\big]_k\)，其中 \(\omega_k=10000^{-k/d}\)，再经过一个小 MLP 变成向量，加到每个残差块里。网络靠它知道“现在噪声有多大”，从而决定是该画大轮廓还是修细节。`],
+ text:['文字编码器 + 交叉注意力',R`文字先被 CLIP 或 T5 编码成一串向量，比如 \(77\times768\)。交叉注意力里，图上每个位置生成查询 \(Q\)，文字向量生成键 \(K\) 和值 \(V\)：\(\mathrm{Attn}(Q,K,V)=\mathrm{softmax}\!\big(QK^\top/\sqrt{d}\big)V\)。于是每个位置都能去“看”和自己有关的词。`],
+ patch:['切成小块',R`把 \(64\times64\) 的潜变量切成 \(2\times2\) 的小方块，共 \(32\times32=1024\) 块，每块拉平后线性映射成一个向量，相当于一个“词”。`],
+ tok:['词元序列',R`\(1024\) 个词元，每个是 \(\mathbb{R}^{1152}\) 里的向量（DiT-XL），再加上位置编码，告诉模型每块原来在哪。`],
+ tf:['Transformer 块',R`和语言模型同一种结构：自注意力让所有小块互相看；文字通过注意力接入（SD3 把图和文字的词元放在一起做联合注意力）；adaLN 用时间步和文字算出缩放 \(\gamma\) 和平移 \(\beta\)，按 \(\gamma\odot\mathrm{LN}(h)+\beta\) 调制每一层。模型越大效果越好，扩展性比 U-Net 更强。`],
+ unpatch:['拼回原尺寸',R`每个词元映射回 \(2\times2\times4\) 个数值，再按位置拼回 \(64\times64\times4\)。`],
+ cond:['条件信息',R`由 \(t\) 和文字得到的全局向量用于 adaLN 调制；文字的逐词向量用于注意力。`]}};
+// ---- LaTeX rendering (KaTeX) ----
+const KOPT={throwOnError:false,trust:c=>c.command==='\\htmlClass',strict:false};
+const DELIMS=[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}];
+function typeset(el){if(window.renderMathInElement){try{renderMathInElement(el,Object.assign({delimiters:DELIMS},KOPT));}catch(e){console.error(e);}}}
+function texInto(el,src){if(window.katex){try{katex.render(src,el,KOPT);return;}catch(e){}}el.textContent=src;}
 function initialLang(){
   try{const q=new URLSearchParams(location.search).get('lang');if(q==='zh'||q==='en')return q;}catch(e){}
   if(location.hash==='#zh')return 'zh';
@@ -441,7 +460,7 @@ function applyLang(){
   document.documentElement.lang=LANG==='zh'?'zh-CN':'en';
   document.title=LANG==='zh'?'扩散模型实验室':'Diffusion Models Lab';
   document.querySelectorAll('[data-i18n]').forEach(el=>{const v=S(el.dataset.i18n);if(v==null)return;
-    if(el.namespaceURI==='http://www.w3.org/2000/svg')el.textContent=v;else el.innerHTML=v;});
+    if(el.namespaceURI==='http://www.w3.org/2000/svg')el.textContent=v;else{el.innerHTML=v;typeset(el);}});
   document.getElementById('lang-en').setAttribute('aria-pressed',LANG==='en');
   document.getElementById('lang-zh').setAttribute('aria-pressed',LANG==='zh');
   document.getElementById('three').setAttribute('aria-label',S('threeAria'));
@@ -525,7 +544,7 @@ function initThree(){
   function show(t){curT=t;
     if(mode==='fwd')setFwd(t);else{let best=0,bd=1e9;for(let k=0;k<histT.length;k++){const d=Math.abs(histT[k]-t);if(d<bd){bd=d;best=k;}}pos.set(hist[best]);}
     pg.attributes.position.needsUpdate=true;paint();updArrows();
-    slider.value=t;tChip.textContent='t = '+t;abNum.textContent='ᾱ = '+AB[t].toFixed(3);}
+    slider.value=t;texInto(tChip,'t='+t);texInto(abNum,'\\bar\\alpha_t='+AB[t].toFixed(3));}
   function setMode(m){mode=m;modeChip.textContent=S(m==='fwd'?'modeFwd':'modeGen');modeChip.className='chip '+(m==='fwd'?'on-noi':'on-sig');}
   langHooks.push(()=>setMode(mode));
 
@@ -596,11 +615,11 @@ function drawArr(cv,arr,scale){const g=cv.getContext('2d');const im=g.createImag
     curve(k=>Math.sqrt(AB[k]),cs);curve(k=>Math.sqrt(1-AB[k]),cn);
     g.strokeStyle=fg;g.lineWidth=1;g.setLineDash([3,3]);g.beginPath();g.moveTo(X(t),tp);g.lineTo(X(t),bt);g.stroke();g.setLineDash([]);
     [[Math.sqrt(AB[t]),cs],[Math.sqrt(1-AB[t]),cn]].forEach(([v,c])=>{g.fillStyle=c;g.beginPath();g.arc(X(t),Y(v),4,0,7);g.fill();});
-    g.font='11px '+cssVar('--f-body');g.textAlign='left';g.fillStyle=cs;g.fillText(S('chartS'),X(40),Y(.93));g.fillStyle=cn;g.fillText(S('chartN'),X(40),Y(.12));}
+    g.textAlign='right';g.fillStyle=mu;g.fillText('t',rt,bt-6);}
   function upd(){const t=+sl.value,sa=Math.sqrt(AB[t]),s1=Math.sqrt(1-AB[t]);for(let i=0;i<DIM;i++)xt[i]=sa*x0[i]+s1*eps[i];drawArr(cxt,xt);
     document.getElementById('barS').style.width=(sa*100)+'%';document.getElementById('barN').style.width=(s1*100)+'%';
     document.getElementById('numS').textContent=sa.toFixed(3);document.getElementById('numN').textContent=s1.toFixed(3);document.getElementById('mixTNum').textContent=t;
-    document.getElementById('sumNum').textContent=sa.toFixed(3)+'² + '+s1.toFixed(3)+'² = '+(sa*sa+s1*s1).toFixed(3);drawChart(t);}
+    texInto(document.getElementById('sumNum'),sa.toFixed(3)+'^2+'+s1.toFixed(3)+'^2='+(sa*sa+s1*s1).toFixed(3));drawChart(t);}
   sl.addEventListener('input',upd);new ResizeObserver(()=>drawChart(+sl.value)).observe(chart);onTheme(()=>drawChart(+sl.value));
   langHooks.push(()=>drawChart(+sl.value));
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>drawChart(+sl.value));
@@ -609,7 +628,7 @@ function drawArr(cv,arr,scale){const g=cv.getContext('2d');const im=g.createImag
 // ================= architecture =================
 const detail=document.getElementById('detail');
 let selK=null,selSvg=null;
-function pick(k,svg){selK=k;selSvg=svg;const it=INFO[LANG][k];if(!it)return;detail.innerHTML='';const h=document.createElement('h3');h.textContent=it[0];const p=document.createElement('p');p.textContent=it[1];detail.append(h,p);
+function pick(k,svg){selK=k;selSvg=svg;const it=INFO[LANG][k];if(!it)return;detail.innerHTML='';const h=document.createElement('h3');h.textContent=it[0];const p=document.createElement('p');p.textContent=it[1];detail.append(h,p);typeset(detail);
   document.querySelectorAll('.blk').forEach(b=>b.classList.toggle('sel',b.dataset.k===k&&b.closest('svg')===svg));}
 langHooks.push(()=>{if(selK)pick(selK,selSvg);});
 document.querySelectorAll('.blk').forEach(b=>{b.setAttribute('tabindex','0');b.setAttribute('role','button');
@@ -643,10 +662,10 @@ DRAW.forEach((_,i)=>{const b=document.createElement('button');b.setAttribute('ar
 const gX=document.getElementById('gX'),gE=document.getElementById('gE'),g0=document.getElementById('g0'),gStep=document.getElementById('gStep'),gStepNum=document.getElementById('gStepNum'),gW=document.getElementById('gW'),gWNum=document.getElementById('gWNum');
 const strip=document.getElementById('strip');const STRIP_K=[0,10,20,30,40,50];const stripCv=[];
 STRIP_K.forEach(k=>{const f=document.createElement('figure');const c=document.createElement('canvas');c.width=c.height=W;
-  c.addEventListener('click',()=>{gAnim=null;showG(k);});const cap=document.createElement('figcaption');cap.textContent='t='+Math.round(T*(1-k/STEPS));f.appendChild(c);f.appendChild(cap);strip.appendChild(f);stripCv.push(c);});
+  c.addEventListener('click',()=>{gAnim=null;showG(k);});const cap=document.createElement('figcaption');texInto(cap,'t='+Math.round(T*(1-k/STEPS)));f.appendChild(c);f.appendChild(cap);strip.appendChild(f);stripCv.push(c);});
 langHooks.push(()=>{const cl=S('classes');promptBtns.forEach((b,i)=>{b.textContent=(LANG==='zh'?'“':'“')+cl[i]+'”';});pr.setAttribute('aria-label',S('promptsAria'));
   stripCv.forEach((c,i)=>{c.title=S('jump')+STRIP_K[i]+(LANG==='zh'?' 步':'');});});
-function showG(k){const f=frames[k];drawArr(gX,f.x);drawArr(gE,f.e,0.5);drawArr(g0,f.x0);gStep.value=k;gStepNum.textContent=k+'/'+STEPS+' · t='+f.t;}
+function showG(k){const f=frames[k];drawArr(gX,f.x);drawArr(gE,f.e,0.5);drawArr(g0,f.x0);gStep.value=k;texInto(gStepNum,k+'/'+STEPS+'\;\\cdot\;t='+f.t);}
 function run(animate){frames=generate(gCls,+gW.value,gSeed);STRIP_K.forEach((k,i)=>drawArr(stripCv[i],frames[k].x));
   if(animate&&!reduceMotion){gAnim={k:0,last:0};showG(0);}else{gAnim=null;showG(STEPS);}}
 gStep.addEventListener('input',()=>{gAnim=null;showG(+gStep.value);});
@@ -657,6 +676,7 @@ document.getElementById('gPlay').addEventListener('click',()=>run(true));
 function gLoop(now){requestAnimationFrame(gLoop);if(gAnim&&now-gAnim.last>90){gAnim.last=now;showG(gAnim.k);gAnim.k++;if(gAnim.k>STEPS)gAnim=null;}}
 requestAnimationFrame(gLoop);
 
+document.querySelectorAll('.eq,label.num').forEach(typeset);
 applyLang();
 run(false);
 })();
